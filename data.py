@@ -1,75 +1,140 @@
+import json
 import os
-from collections import Counter
+import re
 
-from datasets import load_dataset
+import numpy as np
 import pandas as pd
+from tensorflow.keras.layers import TextVectorization
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-# Emotion names by label index (from the dataset card)
-EMOTIONS = ["sadness", "joy", "love", "anger", "fear", "surprise"]
+import config
 
-# Vocabulary size: train has ~15k unique words; the 10k most frequent cover ~98% of all
-# word occurrences, and over half of the words appear only once (see vocab_coverage.csv).
-NUM_WORDS = 10000
-
-# Sequence length: 98.7% of train texts have <= 50 words (longest is 66), so only a few
-# texts lose their last words; longer sequences would slow down RNN training (see length_coverage.csv).
-MAXLEN = 50
-
-
-def load_data():
-    """Download dair-ai/emotion and return train, validation and test splits as pandas DataFrames."""
-    ds = load_dataset("dair-ai/emotion")  # downloads on first run, then uses the local cache
-    train = ds["train"].to_pandas()       # columns: text, label
-    val = ds["validation"].to_pandas()
-    test = ds["test"].to_pandas()
-    return train, val, test
+# GoEmotions label names by index (from the dataset card); the CSV stores label indices
+GOEMOTIONS_LABELS = [
+    "admiration", "amusement", "anger", "annoyance", "approval", "caring", "confusion",
+    "curiosity", "desire", "disappointment", "disapproval", "disgust", "embarrassment",
+    "excitement", "fear", "gratitude", "grief", "joy", "love", "nervousness", "optimism",
+    "pride", "realization", "relief", "remorse", "sadness", "surprise", "neutral",
+]
 
 
-def vocab_coverage(texts, sizes):
-    """For each vocabulary size N, the share of word occurrences covered by the N most frequent words."""
-    counts = Counter(word for text in texts for word in text.split())
-    freqs = [n for _, n in counts.most_common()]   # word frequencies, most frequent first
-    total = sum(freqs)
-    rows = [{"vocab_size": n, "coverage_%": round(sum(freqs[:n]) / total * 100, 1)} for n in sizes]
-    print("Unique words:", len(counts), "| appearing once:", sum(1 for n in freqs if n == 1))
-    return pd.DataFrame(rows)
+def clean_text(text):
+    """Preprocess like dair-ai/emotion: lowercase, no punctuation ("Don't!" -> "dont").
+
+    Letters of any alphabet are kept, so Lithuanian sentences stay readable ("Šiandien" -> "šiandien").
+    """
+    text = text.lower().replace("'", "").replace("’", "")
+    text = re.sub(r"[^\w ]|_", " ", text)        # every symbol that is not a letter or digit becomes a space
+    return re.sub(r" +", " ", text).strip()
 
 
-def length_coverage(texts, lengths):
-    """For each maxlen L, the share of texts that fit fully (have <= L words)."""
-    n_words = texts.str.split().str.len()
-    rows = [{"maxlen": l, "texts_fit_%": round((n_words <= l).mean() * 100, 1)} for l in lengths]
-    print(f"Words per text: mean {n_words.mean():.1f}, median {n_words.median():.0f}, max {n_words.max()}")
-    return pd.DataFrame(rows)
+def download():
+    """Download dair-ai/emotion and GoEmotions once and save them unchanged as CSV files in data/."""
+    from datasets import load_dataset             # only needed for downloading
+    os.makedirs(config.DATA_DIR, exist_ok=True)
+
+    emotion = load_dataset("dair-ai/emotion")
+    for split in ["train", "validation", "test"]:
+        emotion[split].to_pandas().to_csv(_path(f"emotion_{split}.csv"), index=False)
+
+    go = load_dataset("google-research-datasets/go_emotions", "simplified")
+    assert go["train"].features["labels"].feature.names == GOEMOTIONS_LABELS
+    for split in ["train", "validation", "test"]:
+        df = go[split].to_pandas()                # columns: text, labels (list of indices), id
+        df["labels"] = df["labels"].map(lambda labels: json.dumps(labels.tolist()))   # [14] or [3, 17]
+        df.to_csv(_path(f"goemotions_{split}.csv"), index=False)
+
+
+def load(task="6", fraction=1.0, seed=1):
+    """Load dair-ai/emotion as numpy arrays of texts (x) and labels (y).
+
+    task: "6" = six emotions, "2" = positive/negative (S5).
+    fraction: stratified share of train to keep (S4); validation and test are never reduced.
+    """
+    if not os.path.exists(_path("emotion_train.csv")):
+        download()
+    d = {}
+    for name, split in [("train", "train"), ("val", "validation"), ("test", "test")]:
+        df = pd.read_csv(_path(f"emotion_{split}.csv"))
+        if name == "train" and fraction < 1.0:
+            # the same share from every class, so class proportions stay the same
+            df = df.groupby("label").sample(frac=fraction, random_state=seed)
+        d[f"x_{name}"] = df["text"].map(clean_text).to_numpy()   # already clean in the source; kept for consistency
+        d[f"y_{name}"] = _labels(df["label"].to_numpy(), task)
+    return d
+
+
+def load_goemotions(task="6"):
+    """GoEmotions texts with our 6 emotions (generalisation test only, never trained on).
+
+    Keeps texts from all splits that have exactly one label and that label is one of our 6 emotions.
+    """
+    splits = [pd.read_csv(_path(f"goemotions_{split}.csv")) for split in ["train", "validation", "test"]]
+    df = pd.concat(splits, ignore_index=True)
+    names = df["labels"].map(lambda labels: [GOEMOTIONS_LABELS[i] for i in json.loads(labels)])   # "[14]" -> ["fear"]
+    keep = names.map(lambda n: len(n) == 1 and n[0] in config.CLASSES_EN)
+    x = df.loc[keep, "text"].map(clean_text).to_numpy()
+    y = names[keep].map(lambda n: config.CLASSES_EN.index(n[0])).to_numpy()            # ["fear"] -> 4
+    return x, _labels(y, task)
+
+
+def load_lt(task="6"):
+    """Our own Lithuanian sentences and their English translations (generalisation test only).
+
+    lt_sentences.csv columns: text_lt, text_en, label (emotion name in English, e.g. "joy").
+    Returns (x_lt, x_en, y); both texts are cleaned the same way as the training data.
+    """
+    df = pd.read_csv(_path("lt_sentences.csv"))
+    y = df["label"].map(config.CLASSES_EN.index).to_numpy()   # "joy" -> 1
+    x_lt = df["text_lt"].map(clean_text).to_numpy()
+    x_en = df["text_en"].map(clean_text).to_numpy()
+    return x_lt, x_en, _labels(y, task)
+
+
+def vectorize(d, mode="sequence", padding="post"):
+    """Turn the texts in d into model input. The vocabulary is built from train only.
+
+    mode "sequence": (n, SEQUENCE_LENGTH) word indices, for Embedding/CNN/RNN/Transformer models.
+    mode "multi_hot": (n, VOCAB_SIZE) 0/1 vectors, for logistic regression and MLP.
+    padding "post" (zeros at the end) or "pre" (zeros at the start, S2).
+    Returns a copy of d with the x_* replaced and the fitted "vectorizer" added.
+    """
+    # Index 0 = padding, 1 = [UNK] (word not among the VOCAB_SIZE most frequent)
+    vectorizer = TextVectorization(max_tokens=config.VOCAB_SIZE, ragged=True)
+    vectorizer.adapt(d["x_train"])
+
+    result = dict(d, vectorizer=vectorizer)
+    for key in ["x_train", "x_val", "x_test"]:
+        result[key] = encode(vectorizer, d[key], mode, padding)
+    return result
+
+
+def encode(vectorizer, texts, mode="sequence", padding="post"):
+    """Encode any texts (e.g. GoEmotions, LT/EN sentences) with an already fitted vectorizer."""
+    sequences = vectorizer(texts).to_list()       # "i feel happy" -> [2, 3, 57]
+    if mode == "sequence":
+        # truncating is always "post" (keep the first words), so S2 changes only the padding side
+        return pad_sequences(sequences, maxlen=config.SEQUENCE_LENGTH, padding=padding, truncating="post")
+    if mode == "multi_hot":
+        x = np.zeros((len(sequences), config.VOCAB_SIZE), dtype=np.uint8)   # uint8: 16000 x 10000 = 152 MB
+        for i, sequence in enumerate(sequences):
+            x[i, sequence] = 1                    # 1 for every word that occurs in the text
+        x[:, 0] = 0                               # column 0 is padding, never a word
+        return x
+    raise ValueError(f"Unknown mode: {mode}")
+
+
+def _labels(y, task):
+    if task == "2":
+        return np.isin(y, config.POSITIVE_CLASSES).astype(int)
+    return y
+
+
+def _path(filename):
+    return os.path.join(config.DATA_DIR, filename)
 
 
 if __name__ == "__main__":
-    train, val, test = load_data()
-
-    print("Split sizes:", len(train), len(val), len(test))
-    print(train.head())
-
-    # Number of examples per emotion in each split
-    splits = {"train": train, "validation": val, "test": test}
-    counts = pd.DataFrame({name: df["label"].value_counts() for name, df in splits.items()})
-    counts.index = [EMOTIONS[i] for i in counts.index]
-    counts = counts.sort_values("train", ascending=False)
-    counts["total"] = counts.sum(axis=1)
-    counts["share_%"] = (counts["total"] / counts["total"].sum() * 100).round(1)
-    counts.loc["total"] = counts.sum()
-    print(counts)
-
-    # Save the table for the report
-    os.makedirs("results/tables", exist_ok=True)
-    counts.to_csv("results/tables/class_distribution.csv", index_label="emotion")
-    print("Saved results/tables/class_distribution.csv")
-
-    # Statistics behind NUM_WORDS and MAXLEN (computed on train only)
-    vocab = vocab_coverage(train["text"], [1000, 2000, 5000, 8000, 10000, 15000])
-    print(vocab)
-    vocab.to_csv("results/tables/vocab_coverage.csv", index=False)
-
-    lengths = length_coverage(train["text"], [30, 40, 50, 60, 66])
-    print(lengths)
-    lengths.to_csv("results/tables/length_coverage.csv", index=False)
-    print("Saved results/tables/vocab_coverage.csv, results/tables/length_coverage.csv")
+    d = vectorize(load())
+    print("Masyvų dydžiai:", {k: v.shape for k, v in d.items() if k.startswith(("x_", "y_"))})
+    print("Žodyno dydis:", d["vectorizer"].vocabulary_size())

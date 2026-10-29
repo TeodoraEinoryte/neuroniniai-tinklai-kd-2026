@@ -1,2 +1,9 @@
 .venv/
 __pycache__/
+
+# Trained models: only the best one is committed
+results/models/*
+!results/models/best.keras
+
+# Quick test runs (train.py --dev)
+dev/

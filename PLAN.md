@@ -52,7 +52,7 @@ A lab compares a few models on one task. The coursework is a **study** with four
 | Generalisation | – | – | GoEmotions (6,535 texts) and Lithuanian sentences |
 | Extra studies | hyperparameters | hyperparameters | masking, class weights, training-set size, binary vs 6 classes |
 | Interpretation | – | – | attention heatmaps, error examples, negation subset |
-| Product | – | – | `prognozuoti.py`: sentence in → emotion probabilities out |
+| Product | – | – | `predict.py`: sentence in → emotion probabilities out |
 
 ## 3. Data
 
@@ -162,138 +162,141 @@ About 340 training runs, roughly 2–4 hours of CPU time in total.
 ```
 neuroniniai-tinklai-kd-2026/
   README.md, PLAN.md, requirements.txt, .gitignore
-  config.py            shared settings (section 4), class names in Lithuanian
-  duomenys.py          A: loading, vectorising, pre/post padding, binary version, subsets, GoEmotions, LT
-  analize_duomenu.py   A: data analysis figures + quality checks + baselines (report 3.1)
-  modeliai_A.py        A: logreg, MLP, Embedding, Conv1D, Transformer
-  modeliai_B.py        B: SimpleRNN, LSTM, GRU, BiLSTM, BiLSTM + attention
-  vertinimas.py        B: metrics in numpy, confusion matrix, McNemar, plots
-  mokyti.py            B: one run → one CSV row + curve + matrix + predictions (+ saved model for S1)
-  bandymai.py          B: runs a whole study: python bandymai.py S1
-  palyginimas.py       report tables and figures, one function per study (B: T0, S1, S2, S3, S7, S8; A: S4, S5)
-  generalizacija.py    A: S6 tables (GoEmotions, LT/EN)
-  prognozuoti.py       A: demo
-  duomenys/            emotion_{train,validation,test}.csv, goemotions_6.csv, lt_sakiniai.csv
-  rezultatai/          rezultatai.csv, kreives/, matricos/, prognozes/, lenteles/, grafikai/,
-                       modeliai/geriausias.keras (only the best model is committed; the rest and dev/ are git-ignored)
+  config.py            shared settings (section 4), class names in English and Lithuanian
+  download_data.py     A: one-off script that created data/*.csv from Hugging Face
+  data.py              A: loading, vectorising, pre/post padding, binary version, subsets, GoEmotions, LT
+  data_analysis.py     A: data analysis figures + quality checks + baselines (report 3.1)
+  models_a.py          A: logreg, MLP, Embedding, Conv1D, Transformer
+  models_b.py          B: SimpleRNN, LSTM, GRU, BiLSTM, BiLSTM + attention
+  evaluation.py        B: metrics in numpy, confusion matrix, McNemar, plots
+  train.py             B: one run → one CSV row + curve + matrix + predictions (+ saved model for S1)
+  run_study.py         B: runs a whole study: python run_study.py S1
+  compare.py           report tables and figures, one function per study (B: T0, S1, S2, S3, S7, S8; A: S4, S5)
+  generalization.py    A: S6 tables (GoEmotions, LT/EN)
+  predict.py           A: demo
+  data/                emotion_{train,validation,test}.csv, goemotions_{train,validation,test}.csv, lt_sentences.csv
+                       (original texts; cleaning and filtering happen in data.py)
+  results/             results.csv, curves/, matrices/, predictions/, tables/, figures/,
+                       models/best.keras (only the best model is committed; the rest and dev/ are git-ignored)
 ```
 
 ### Interfaces: agree on these first, then both of us can code in parallel
 
 ```python
-# duomenys.py (A)
-ikelti(uzduotis="6", dalis=1.0, seed=1) -> dict
-    # x_train, y_train, x_val, y_val, x_test, y_test (np.array of str / int); "dalis" = stratified share of train (S4)
-vektorizuoti(d, rezimas="seka", padding="post") -> dict
-    # rezimas "seka" → (n, 50) int; "multi_hot" → (n, 10000); vocabulary from train only; padding "pre" for S2
-ikelti_goemotions() -> (x, y)
-ikelti_lt() -> (x_lt, x_en, y)
+# data.py (A)
+load_emotion(task="6", fraction=1.0, seed=1) -> dict
+    # x_train, y_train, x_val, y_val, x_test, y_test (np.array of str / int); "fraction" = stratified share of train (S4)
+vectorize(d, mode="sequence", padding="post") -> dict
+    # mode "sequence" → (n, 50) int; "multi_hot" → (n, 10000); vocabulary from train only; padding "pre" for S2
+    # also returns the fitted "vectorizer"; encode(vectorizer, texts, mode, padding) encodes any other texts
+load_goemotions(task="6") -> (x, y)
+load_lt() -> (x_lt, x_en, y)
 
-# modeliai_A.py / modeliai_B.py: every function returns an UNCOMPILED keras.Model
-sukurti_lstm(dydis=64, kauke=True, n_klasiu=6) -> keras.Model
-MODELIAI_B = {"lstm": (sukurti_lstm, "seka", [32, 64, 128]), ...}   # function, input type, T0 values
+# models_a.py / models_b.py: every function returns an UNCOMPILED keras.Model
+build_lstm(size=64, mask=True, n_classes=6) -> keras.Model
+MODELS_B = {"lstm": (build_lstm, "sequence", [32, 64, 128]), ...}   # function, input type, T0 values
 
-# vertinimas.py (B)
-metrikos(y, p, n_klasiu) -> dict      # accuracy, macro_f1, precision/recall/f1 per class
-klaidu_matrica(y, p, n_klasiu) -> np.array
-mcnemar(y, p1, p2) -> (chi2, p_reiksme)
+# evaluation.py (B)
+metrics(y, p, n_classes) -> dict      # accuracy, macro_f1, precision/recall/f1 per class
+confusion_matrix(y, p, n_classes) -> np.array
+mcnemar(y, p1, p2) -> (chi2, p_value)
 ```
 
 ```bash
-python mokyti.py --modelis lstm --seed 1 --tyrimas S1 [--dydis 64] [--be-kaukes] [--padding pre]
-                 [--class-weight] [--dalis 0.25] [--uzduotis 2] [--dev]
-python bandymai.py S2            # all runs of one study
-python palyginimas.py            # tables and figures for the report
-python prognozuoti.py "i feel so alone tonight"
+python train.py --model lstm --seed 1 --study S1 [--size 64] [--no-mask] [--padding pre]
+                [--class-weight] [--fraction 0.25] [--task 2] [--dev]
+python run_study.py S2           # all runs of one study
+python compare.py                # tables and figures for the report
+python predict.py "i feel so alone tonight"
 ```
 
-**`rezultatai.csv`, one row per run:**
-- run info: `data`, `tyrimas`, `modelis`, `seima`, `variantas`, `seed`, `kompiuteris`
-- model and training: `parametrai`, `epochos`, `mokymo_laikas_s`, `prognozes_ms_1000`
+**`results.csv`, one row per run:**
+- run info: `date`, `study`, `model`, `family`, `variant`, `seed`, `machine`
+- model and training: `params`, `epochs`, `train_time_s`, `predict_ms_1000`
 - validation: `val_acc`, `val_loss`, `val_macro_f1`
-- test: `test_acc`, `test_loss`, `test_macro_f1`, `f1_liudesys` … `f1_nuostaba`
+- test: `test_acc`, `test_loss`, `test_macro_f1`, `f1_sadness` … `f1_surprise`
 
-Predictions for every text are saved per run in `prognozes/` (test, plus GoEmotions and LT/EN in S1), which S6, S7 and McNemar need.
+Predictions for every text are saved per run in `predictions/` (test, plus GoEmotions and LT/EN in S1), which S6, S7 and McNemar need.
 
 ## 8. Who does what (summary)
 
 | | A — Teodora | B — Edgaras |
 |---|---|---|
 | Models (5 each) | logreg, MLP, Embedding, Conv1D, Transformer | SimpleRNN, LSTM, GRU, BiLSTM, BiLSTM + attention |
-| Shared code | `duomenys.py`, `analize_duomenu.py`, `generalizacija.py`, `prognozuoti.py` | `vertinimas.py`, `mokyti.py`, `bandymai.py`, most of `palyginimas.py` |
+| Shared code | `data.py`, `data_analysis.py`, `generalization.py`, `predict.py` | `evaluation.py`, `train.py`, `run_study.py`, most of `compare.py` |
 | Studies | data analysis, S4, S5, S6, demo | running T0 and S1, S2, S3, S7, S8 |
 | Report text | ~22,700 characters (section 10) | ~21,700 characters + drafts of 3.2, 3.3, 2.4.10, conclusions (section 10) |
 | Talk | ~half of the slides | ~half of the slides |
-| Also | Google Doc owner: outline, styles, final formatting | repo setup, number check, character/page count |
+| Also | repo setup, Google Doc owner: outline, styles, final formatting | number check, character/page count |
 
 ## 9. Steps
 
 Phases overlap. Writing that needs no results (literature, model theory) starts in phase 1. **"Needs"** lists the steps that must be finished first.
 
 ### Phase 0 — Agree and set up
-| # | Step | Owner | Needs | Done when |
-|---|---|---|---|---|
-| 0.1 | Read this plan, settle the open decisions (section 13) | both | – | plan merged in `main` |
-| 0.2 | Repo setup: `requirements.txt`, `.gitignore`, `config.py`, data CSVs (emotion, GoEmotions) | B | 0.1 | `duomenys/` in repo |
-| 0.3 | Google Doc: outline from section 10, styles (TNR 12, single spacing, Heading 1–3, captions), character budget per section as a comment, working list of sources | A | 0.1 | doc matches section 10 |
-| 0.4 | Register the talk date | both | – | date booked |
+| # | Step | Owner | Needs | Done when | Status |
+|---|---|---|---|---|---|
+| 0.1 | Read this plan, settle the open decisions (section 13) | both | – | plan merged in `main` | ✅ |
+| 0.2 | Repo setup: `requirements.txt`, `.gitignore`, `config.py`, data CSVs (emotion, GoEmotions) | A | 0.1 | `data/` in repo | ✅ |
+| 0.3 | Google Doc: outline from section 10, styles (TNR 12, single spacing, Heading 1–3, captions), character budget per section as a comment, working list of sources | A | 0.1 | doc matches section 10 |  |
+| 0.4 | Register the talk date | both | – | date booked |  |
 
 ### Phase 1 — Shared code
-| # | Step | Owner | Needs | Done when |
-|---|---|---|---|---|
-| 1.1 | `duomenys.py`: `ikelti`, `vektorizuoti` (post/pre padding, multi-hot), binary, stratified subsets, GoEmotions, LT | A | 0.2 | functions match section 7 |
-| 1.2 | `vertinimas.py`: metrics in numpy, confusion matrix, McNemar, plots in Lithuanian; checked on a small hand-computed example | B | – | example matches hand calculation |
-| 1.3 | `mokyti.py` + `bandymai.py` | B | 1.1, 1.2 | `python mokyti.py --modelis logreg --seed 1 --dev` writes a row, curve and matrix |
-| 1.4 | `analize_duomenu.py`: class and length plots, quality checks, majority and keyword baselines | A | 1.1 | figures and numbers for 3.1 |
-| 1.5 | LT sentences: 30 each (5 per emotion) + English translations → `lt_sakiniai.csv` | both | – | 60 rows |
+| # | Step | Owner | Needs | Done when | Status |
+|---|---|---|---|---|---|
+| 1.1 | `data.py`: `load_emotion`, `vectorize` (post/pre padding, multi-hot), binary, stratified subsets, GoEmotions, LT | A | 0.2 | functions match section 7 | ✅ |
+| 1.2 | `evaluation.py`: metrics in numpy, confusion matrix, McNemar, plots in Lithuanian; checked on a small hand-computed example | B | – | example matches hand calculation |  |
+| 1.3 | `train.py` + `run_study.py` | B | 1.1, 1.2 | `python train.py --model logreg --seed 1 --dev` writes a row, curve and matrix |  |
+| 1.4 | `data_analysis.py`: class and length plots, quality checks, majority and keyword baselines | A | 1.1 | figures and numbers for 3.1 |  |
+| 1.5 | LT sentences: 30 each (5 per emotion) + English translations → `lt_sentences.csv` | both | – | 60 rows |  |
 
 ### Phase 2 — Models
-| # | Step | Owner | Needs | Done when |
-|---|---|---|---|---|
-| 2.1 | `modeliai_A.py`: 5 models | A | 1.3 | each trains via `mokyti.py --dev` |
-| 2.2 | `modeliai_B.py`: 5 models; the attention model can output word weights | B | 1.3 | each trains via `mokyti.py --dev` |
-| 2.3 | T0 tuning: B runs it for all models; each owner picks own sizes → `config.py` | run B, pick each | 2.1, 2.2 | T0 rows in CSV, sizes in `config.py` |
+| # | Step | Owner | Needs | Done when | Status |
+|---|---|---|---|---|---|
+| 2.1 | `models_a.py`: 5 models | A | 1.3 | each trains via `train.py --dev` |  |
+| 2.2 | `models_b.py`: 5 models; the attention model can output word weights | B | 1.3 | each trains via `train.py --dev` |  |
+| 2.3 | T0 tuning: B runs it for all models; each owner picks own sizes → `config.py` | run B, pick each | 2.1, 2.2 | T0 rows in CSV, sizes in `config.py` |  |
 
 ### Phase 3 — Experiments
-| # | Step | Owner | Needs | Done when |
-|---|---|---|---|---|
-| 3.1 | S1 main comparison (saves predictions + best model) | B | 2.3, 1.5 | 50 S1 rows, predictions committed |
-| 3.2 | S2 masking, S3 class weights | B | 3.1 | rows in CSV |
-| 3.3 | S4 training-set size, S5 binary | A | 2.3 | rows in CSV |
+| # | Step | Owner | Needs | Done when | Status |
+|---|---|---|---|---|---|
+| 3.1 | S1 main comparison (saves predictions + best model) | B | 2.3, 1.5 | 50 S1 rows, predictions committed |  |
+| 3.2 | S2 masking, S3 class weights | B | 3.1 | rows in CSV |  |
+| 3.3 | S4 training-set size, S5 binary | A | 2.3 | rows in CSV |  |
 
 ### Phase 4 — Analysis outputs
-| # | Step | Owner | Needs | Done when |
-|---|---|---|---|---|
-| 4.1 | `palyginimas.py`: T0, S1, S2, S3, S8 tables and figures; McNemar table | B | 3.1, 3.2 | files in `lenteles/`, `grafikai/` |
-| 4.2 | `palyginimas.py` S4, S5 functions; `generalizacija.py` S6 | A | 3.1, 3.3 | files in `lenteles/`, `grafikai/` |
-| 4.3 | S7: confusion matrices, most-confused pairs, misclassified examples, negation subset, attention heatmaps | B | 3.1 | figures + example table |
-| 4.4 | `prognozuoti.py` demo + screenshot | A | 3.1 | works on any sentence |
+| # | Step | Owner | Needs | Done when | Status |
+|---|---|---|---|---|---|
+| 4.1 | `compare.py`: T0, S1, S2, S3, S8 tables and figures; McNemar table | B | 3.1, 3.2 | files in `tables/`, `figures/` |  |
+| 4.2 | `compare.py` S4, S5 functions; `generalization.py` S6 | A | 3.1, 3.3 | files in `tables/`, `figures/` |  |
+| 4.3 | S7: confusion matrices, most-confused pairs, misclassified examples, negation subset, attention heatmaps | B | 3.1 | figures + example table |  |
+| 4.4 | `predict.py` demo + screenshot | A | 3.1 | works on any sentence |  |
 
 ### Phase 5 — Writing (details in section 10)
-| # | Step | Owner | Needs |
-|---|---|---|---|
-| 5.1 | Literature review sections | each own | sources (start now) |
-| 5.2 | Model theory sections | each own | – (start now) |
-| 5.3 | Methodology: data, protocol, metrics, training | each own | 2.3 (final architectures) |
-| 5.4 | Results sections | each own | phase 4 |
-| 5.5 | Shared sections: main comparison, summaries | drafter, then the other adds | 4.1 |
-| 5.6 | Intro and conclusions (written last) | A drafts intro, B drafts conclusions, both edit | 5.1–5.5 |
+| # | Step | Owner | Needs | Status |
+|---|---|---|---|---|
+| 5.1 | Literature review sections | each own | sources (start now) |  |
+| 5.2 | Model theory sections | each own | – (start now) |  |
+| 5.3 | Methodology: data, protocol, metrics, training | each own | 2.3 (final architectures) |  |
+| 5.4 | Results sections | each own | phase 4 |  |
+| 5.5 | Shared sections: main comparison, summaries | drafter, then the other adds | 4.1 |  |
+| 5.6 | Intro and conclusions (written last) | A drafts intro, B drafts conclusions, both edit | 5.1–5.5 |  |
 
 ### Phase 6 — Assembly and checks
-| # | Step | Owner | Done when |
-|---|---|---|---|
-| 6.1 | Cross-review: A reviews B's sections, B reviews A's (checklist in section 10) | both | all comments resolved |
-| 6.2 | Number check: every number in the doc matches the generated tables | B | no mismatches |
-| 6.3 | Formatting: title page, table of contents, figure/table numbering and captions, page numbers, reference list | A | doc is consistent |
-| 6.4 | Export .docx; count characters and pages; trim or extend to fit 22–26 | B | inside the limits |
-| 6.5 | Read it through together and upload to Moodle | both | uploaded before the deadline |
+| # | Step | Owner | Done when | Status |
+|---|---|---|---|---|
+| 6.1 | Cross-review: A reviews B's sections, B reviews A's (checklist in section 10) | both | all comments resolved |  |
+| 6.2 | Number check: every number in the doc matches the generated tables | B | no mismatches |  |
+| 6.3 | Formatting: title page, table of contents, figure/table numbering and captions, page numbers, reference list | A | doc is consistent |  |
+| 6.4 | Export .docx; count characters and pages; trim or extend to fit 22–26 | B | inside the limits |  |
+| 6.5 | Read it through together and upload to Moodle | both | uploaded before the deadline |  |
 
 ### Phase 7 — Talk (section 11)
-| # | Step | Owner |
-|---|---|---|
-| 7.1 | Slides: each makes own half, one shared template | both |
-| 7.2 | Defence notes: likely questions per person; rehearse to 8–9 min | both |
-| 7.3 | Upload slides (PPTX or PDF) one day before | A |
+| # | Step | Owner | Status |
+|---|---|---|---|
+| 7.1 | Slides: each makes own half, one shared template | both |  |
+| 7.2 | Defence notes: likely questions per person; rehearse to 8–9 min | both |  |
+| 7.3 | Upload slides (PPTX or PDF) one day before | A |  |
 
 ## 10. Writing the report
 

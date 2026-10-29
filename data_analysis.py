@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 import config
-from data import load_emotion, load_goemotions, load_lt, vectorize
+from data import goemotions_keep, load_emotion, load_goemotions, load_goemotions_raw, load_lt, vectorize
 
 TABLES_DIR = os.path.join(config.RESULTS_DIR, "tables")
 
@@ -60,6 +60,31 @@ def dataset_overview(d, datasets):
     return pd.DataFrame(columns)
 
 
+def goemotions_filter():
+    """How many GoEmotions texts our filter (data.goemotions_keep) keeps and drops, and why."""
+    names = load_goemotions_raw()["names"]
+    keep = goemotions_keep(names)                 # the same filter the models get
+    dropped = names[~keep]
+
+    # Reasons for dropping are only described here; data.py needs just the kept texts
+    steps = pd.DataFrame({"tekstų": {
+        "iš viso": len(names),
+        "išmesta: kelios emocijos": int((dropped.str.len() > 1).sum()),
+        "išmesta: neutral": int(dropped.map(lambda n: n == ["neutral"]).sum()),
+        "išmesta: kita emocija (22 kitos)": int(dropped.map(lambda n: len(n) == 1 and n != ["neutral"]).sum()),
+        "liko: viena iš mūsų 6 emocijų": int(keep.sum()),
+    }})
+
+    # Per emotion: texts with this emotion among their labels vs texts kept after the filter
+    kept = names[keep].str[0]
+    per_class = pd.DataFrame({
+        "pažymėta šia emocija": [int(names.map(lambda n: e in n).sum()) for e in config.CLASSES_EN],
+        "liko po filtro": [int((kept == e).sum()) for e in config.CLASSES_EN],
+    }, index=config.CLASSES_LT)
+    per_class["liko, %"] = (per_class["liko po filtro"] / per_class["pažymėta šia emocija"] * 100).round(1)
+    return steps, per_class
+
+
 def save(table, filename, **kwargs):
     table.to_csv(os.path.join(TABLES_DIR, filename), **kwargs)
     print("Išsaugota:", os.path.join(TABLES_DIR, filename))
@@ -72,7 +97,7 @@ if __name__ == "__main__":
 
     classes = class_distribution(d)
     print(classes)
-    save(classes, "class_distribution.csv", index_label="emocija")
+    save(classes, "emotion_class_distribution.csv", index_label="emocija")
 
     # Statistics behind VOCAB_SIZE and SEQUENCE_LENGTH in config.py (computed on train only)
     vocab = vocab_coverage(d["x_train"], [1000, 2000, 5000, 8000, 10000, 15000])
@@ -88,6 +113,7 @@ if __name__ == "__main__":
     x_lt, x_en, y_lt = load_lt()
     overview = dataset_overview(d, {
         "dair-ai train": (d["x_train"], d["y_train"]),
+        "dair-ai validation": (d["x_val"], d["y_val"]),
         "dair-ai test": (d["x_test"], d["y_test"]),
         "GoEmotions": (x_go, y_go),
         "LT sakiniai": (x_lt, y_lt),
@@ -95,3 +121,9 @@ if __name__ == "__main__":
     })
     print(overview.to_string())
     save(overview, "dataset_overview.csv", index_label="rodiklis")
+
+    steps, per_class = goemotions_filter()
+    print(steps.to_string())
+    print(per_class.to_string())
+    save(steps, "goemotions_filter.csv", index_label="žingsnis")
+    save(per_class, "goemotions_filter_per_class.csv", index_label="emocija")

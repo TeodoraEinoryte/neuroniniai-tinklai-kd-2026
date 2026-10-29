@@ -45,17 +45,28 @@ def load_emotion(task="6", fraction=1.0, seed=1):
     return d
 
 
-def load_goemotions(task="6"):
-    """GoEmotions texts with our 6 emotions (generalisation test only, never trained on).
+def load_goemotions_raw():
+    """All GoEmotions texts (all splits) with their label names, before our filter.
 
-    Keeps texts from all splits that have exactly one label and that label is one of our 6 emotions.
+    Returns a DataFrame with columns text (original) and names (list of label names).
     """
     splits = [pd.read_csv(_path(f"goemotions_{split}.csv")) for split in ["train", "validation", "test"]]
     df = pd.concat(splits, ignore_index=True)
-    names = df["labels"].map(lambda labels: [GOEMOTIONS_LABELS[i] for i in json.loads(labels)])   # "[14]" -> ["fear"]
-    keep = names.map(lambda n: len(n) == 1 and n[0] in config.CLASSES_EN)
-    x = df.loc[keep, "text"].map(clean_text).to_numpy()
-    y = names[keep].map(lambda n: config.CLASSES_EN.index(n[0])).to_numpy()            # ["fear"] -> 4
+    df["names"] = df["labels"].map(lambda labels: [GOEMOTIONS_LABELS[i] for i in json.loads(labels)])   # "[14]" -> ["fear"]
+    return df[["text", "names"]]
+
+
+def goemotions_keep(names):
+    """Our filter: True for texts with exactly one label that is one of our 6 emotions."""
+    return names.map(lambda n: len(n) == 1 and n[0] in config.CLASSES_EN)
+
+
+def load_goemotions(task="6"):
+    """GoEmotions texts with our 6 emotions (generalisation test only, never trained on)."""
+    df = load_goemotions_raw()
+    df = df[goemotions_keep(df["names"])]
+    x = df["text"].map(clean_text).to_numpy()
+    y = df["names"].map(lambda n: config.CLASSES_EN.index(n[0])).to_numpy()   # ["fear"] -> 4
     return x, _labels(y, task)
 
 

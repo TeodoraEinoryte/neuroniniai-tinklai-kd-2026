@@ -163,6 +163,7 @@ About 340 training runs, roughly 2–4 hours of CPU time in total.
 neuroniniai-tinklai-kd-2026/
   README.md, PLAN.md, requirements.txt, .gitignore
   config.py            shared settings (section 4), class names in English and Lithuanian
+  download_data.py     A: one-off script that created data/*.csv from Hugging Face
   data.py              A: loading, vectorising, pre/post padding, binary version, subsets, GoEmotions, LT
   data_analysis.py     A: data analysis figures + quality checks + baselines (report 3.1)
   models_a.py          A: logreg, MLP, Embedding, Conv1D, Transformer
@@ -183,7 +184,7 @@ neuroniniai-tinklai-kd-2026/
 
 ```python
 # data.py (A)
-load(task="6", fraction=1.0, seed=1) -> dict
+load_emotion(task="6", fraction=1.0, seed=1) -> dict
     # x_train, y_train, x_val, y_val, x_test, y_test (np.array of str / int); "fraction" = stratified share of train (S4)
 vectorize(d, mode="sequence", padding="post") -> dict
     # mode "sequence" → (n, 50) int; "multi_hot" → (n, 10000); vocabulary from train only; padding "pre" for S2
@@ -243,7 +244,7 @@ Phases overlap. Writing that needs no results (literature, model theory) starts 
 ### Phase 1 — Shared code
 | # | Step | Owner | Needs | Done when | Status |
 |---|---|---|---|---|---|
-| 1.1 | `data.py`: `load`, `vectorize` (post/pre padding, multi-hot), binary, stratified subsets, GoEmotions, LT | A | 0.2 | functions match section 7 | ✅ |
+| 1.1 | `data.py`: `load_emotion`, `vectorize` (post/pre padding, multi-hot), binary, stratified subsets, GoEmotions, LT | A | 0.2 | functions match section 7 | ✅ |
 | 1.2 | `evaluation.py`: metrics in numpy, confusion matrix, McNemar, plots in Lithuanian; checked on a small hand-computed example | B | – | example matches hand calculation |  |
 | 1.3 | `train.py` + `run_study.py` | B | 1.1, 1.2 | `python train.py --model logreg --seed 1 --dev` writes a row, curve and matrix |  |
 | 1.4 | `data_analysis.py`: class and length plots, quality checks, majority and keyword baselines | A | 1.1 | figures and numbers for 3.1 |  |

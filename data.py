@@ -28,31 +28,12 @@ def clean_text(text):
     return re.sub(r" +", " ", text).strip()
 
 
-def download():
-    """Download dair-ai/emotion and GoEmotions once and save them unchanged as CSV files in data/."""
-    from datasets import load_dataset             # only needed for downloading
-    os.makedirs(config.DATA_DIR, exist_ok=True)
-
-    emotion = load_dataset("dair-ai/emotion")
-    for split in ["train", "validation", "test"]:
-        emotion[split].to_pandas().to_csv(_path(f"emotion_{split}.csv"), index=False)
-
-    go = load_dataset("google-research-datasets/go_emotions", "simplified")
-    assert go["train"].features["labels"].feature.names == GOEMOTIONS_LABELS
-    for split in ["train", "validation", "test"]:
-        df = go[split].to_pandas()                # columns: text, labels (list of indices), id
-        df["labels"] = df["labels"].map(lambda labels: json.dumps(labels.tolist()))   # [14] or [3, 17]
-        df.to_csv(_path(f"goemotions_{split}.csv"), index=False)
-
-
-def load(task="6", fraction=1.0, seed=1):
+def load_emotion(task="6", fraction=1.0, seed=1):
     """Load dair-ai/emotion as numpy arrays of texts (x) and labels (y).
 
     task: "6" = six emotions, "2" = positive/negative (S5).
     fraction: stratified share of train to keep (S4); validation and test are never reduced.
     """
-    if not os.path.exists(_path("emotion_train.csv")):
-        download()
     d = {}
     for name, split in [("train", "train"), ("val", "validation"), ("test", "test")]:
         df = pd.read_csv(_path(f"emotion_{split}.csv"))
@@ -135,6 +116,6 @@ def _path(filename):
 
 
 if __name__ == "__main__":
-    d = vectorize(load())
+    d = vectorize(load_emotion())
     print("Masyvų dydžiai:", {k: v.shape for k, v in d.items() if k.startswith(("x_", "y_"))})
     print("Žodyno dydis:", d["vectorizer"].vocabulary_size())

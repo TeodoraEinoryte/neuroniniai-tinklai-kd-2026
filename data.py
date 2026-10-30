@@ -17,6 +17,13 @@ GOEMOTIONS_LABELS = [
     "pride", "realization", "relief", "remorse", "sadness", "surprise", "neutral",
 ]
 
+# The emotion word (keyword rule in data_analysis.py, keyword test S13): the first word after a feel-word,
+# skipping intensifiers and small words, so "i feel so very lonely" -> "lonely"
+FEEL_WORDS = {"feel", "feels", "feeling", "felt"}
+SKIP_WORDS = {"so", "very", "really", "a", "bit", "little", "more", "quite", "kind", "of", "like", "that", "too",
+              "pretty", "extremely", "incredibly", "rather", "somewhat", "even", "just", "most", "less", "the",
+              "all", "completely", "totally"}
+
 
 def clean_text(text):
     """Preprocess like dair-ai/emotion: lowercase, no punctuation ("Don't!" -> "dont").
@@ -26,6 +33,21 @@ def clean_text(text):
     text = text.lower().replace("'", "").replace("’", "")
     text = re.sub(r"[^\w ]|_", " ", text)        # every symbol that is not a letter or digit becomes a space
     return re.sub(r" +", " ", text).strip()
+
+
+def emotion_word(text):
+    """Position of the emotion word in a cleaned text, or None if the text has no feel-word.
+
+    "i feel so humiliated today" -> 3 ("humiliated"); the word itself is text.split()[position].
+    """
+    words = text.split()
+    for i, word in enumerate(words[:-1]):
+        if word in FEEL_WORDS:
+            j = i + 1
+            while j < len(words) - 1 and words[j] in SKIP_WORDS:   # "so", "very", "a little" ... are skipped
+                j += 1
+            return j
+    return None
 
 
 def load_emotion(task="6", fraction=1.0, seed=1):

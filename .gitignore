@@ -7,3 +7,6 @@ results/models/*
 
 # Quick test runs (train.py --dev)
 dev/
+
+# GloVe vectors for S12 (download_glove.py), ~330 MB
+data/glove/

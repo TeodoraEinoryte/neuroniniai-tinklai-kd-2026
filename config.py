@@ -25,9 +25,14 @@ EPOCHS = 30             # upper limit; EarlyStopping usually stops earlier
 PATIENCE = 3            # EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True)
 SEEDS = [1, 2, 3, 4, 5] # for keras.utils.set_random_seed
 
-# Size chosen in T0 for each model, e.g. {"lstm": 64}; filled at step 2.4.
+# Size chosen in T0a for each model, e.g. {"lstm": 64}; filled at step 2.4.
 # Until then train.py uses the middle T0 value.
 MODEL_SIZES = {}
+
+# Learning rate chosen in T0b for each model (LEARNING_RATE x 0.3 / x 1 / x 3), e.g. {"transformer": 0.0003};
+# filled at step 2.4. Models not listed use LEARNING_RATE.
+MODEL_LEARNING_RATES = {}
+T0B_FACTORS = [0.3, 3]    # x 1 is the T0a run itself
 
 # S9: best learning rate of each optimiser from the S9a grid, e.g. {"sgd": 0.1}; filled at step 2.3
 S9_LEARNING_RATES = {}

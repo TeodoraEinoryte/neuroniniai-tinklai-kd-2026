@@ -327,7 +327,7 @@ Phases overlap. Writing that needs no results (literature, model theory) starts 
 | 1.4 | `data_analysis.py`: class and length plots, quality checks, majority and keyword baselines | A | 1.1 | figures and numbers for 4.1 | 🟡 tables done (classes, vocabulary, length, dataset overview, GoEmotions filter); plots, quality checks (feel-words, conflicts, leakage) and baselines still to do |
 | 1.5 | LT sentences: 30 each (5 per emotion) + English translations → `lt_sentences.csv` | both | – | 60 rows | 🟡 file format set, 2 example rows of 60 |
 | 1.6 | `data.py`: `keyword_variants` (S13) and `test_in_train` (duplicates check), each checked on a few hand-made examples | A | 1.1 | functions match section 7 |  |
-| 1.7 | Code for the review additions: `evaluation.holm` (checked on a hand example), per-model learning rate in `train.py` (`config.MODEL_LEARNING_RATES`), T0a/T0b in `run_study.py`, keyword-test predictions in S1/S12 | B | 1.6 for the keyword predictions | tested in `--dev` |  |
+| 1.7 | Code for the review additions: `evaluation.holm` (checked on a hand example), per-model learning rate in `train.py` (`config.MODEL_LEARNING_RATES`), T0a/T0b in `run_study.py`, keyword-test predictions in S1/S12 | B | 1.6 for the keyword predictions | tested in `--dev` | ✅ Holm checked by hand in `python evaluation.py`; S1 variant names stay the same when the T0b rate is used (the rate is in the `lr` column); T0b refuses to start before `MODEL_SIZES` is filled; S1/S12 save `p_kw_without`, `p_kw_only`, `kw_has` and refuse to start until `data.keyword_variants` (1.6) exists. Tested with a stand-in for 1.6 |
 
 ### Phase 2 — Models
 | # | Step | Owner | Needs | Done when | Status |

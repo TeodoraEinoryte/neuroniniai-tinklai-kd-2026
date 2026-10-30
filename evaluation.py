@@ -54,6 +54,23 @@ def mcnemar(y, p1, p2):
     return chi2, p_value
 
 
+def holm(p_values, alpha=0.05):
+    """Holm–Bonferroni correction for m tests at once (e.g. the best model vs each of 10 others).
+
+    Sort the p-values from smallest to largest; the i-th smallest (i = 1 ... m) must be <= alpha / (m - i + 1).
+    Stop at the first one that fails: it and all larger p-values are not significant.
+    Returns a bool array in the original order: True = still significant after the correction.
+    """
+    p_values = np.asarray(p_values, dtype=float)
+    m = len(p_values)
+    significant = np.zeros(m, dtype=bool)
+    for i, index in enumerate(np.argsort(p_values)):   # i = 0 for the smallest p-value
+        if p_values[index] > alpha / (m - i):
+            break
+        significant[index] = True
+    return significant
+
+
 def plot_learning_curves(history, title, path):
     """Accuracy and loss per epoch for train and validation; history = keras History.history."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.8))
@@ -138,6 +155,13 @@ if __name__ == "__main__":
     assert abs(p_value - 0.248) < 1e-3
     assert abs(mcnemar(y, p1, p1)[1] - 1.0) < 1e-12       # identical models: no difference
     assert abs(math.erfc(math.sqrt(3.841 / 2)) - 0.05) < 1e-3   # table value: chi2 = 3.841 -> p = 0.05
+
+    # Holm by hand: p = 0.01, 0.04, 0.03, 0.005 (m = 4); all four are < 0.05 on their own.
+    # Sorted: 0.005 <= 0.05/4 = 0.0125 yes; 0.01 <= 0.05/3 = 0.0167 yes; 0.03 <= 0.05/2 = 0.025 no -> stop.
+    # So only 0.01 and 0.005 stay significant.
+    significant = holm([0.01, 0.04, 0.03, 0.005])
+    print("Holm:", significant)
+    assert significant.tolist() == [True, False, False, True]
 
     # Cross-check with Keras (library used only for checking, as for the labs)
     import keras

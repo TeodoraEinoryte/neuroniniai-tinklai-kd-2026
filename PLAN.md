@@ -36,7 +36,7 @@ A lab compares a few models on one task. The coursework is a **study** with four
 
 1. **Which architecture recognises emotions in short texts best, and at what cost?** 10 models from 4 families, 5 seeds each, statistical test with correction for multiple comparisons, parameters and time; a fine-tuned DistilBERT run by us as the competitor.
 2. **Which training choices matter for text?** Optimiser and learning rate (9 optimisers), padding/masking in recurrent networks, class weights and focal loss for uneven classes, regularisation (Dropout, L2), depth, pretrained word vectors (GloVe), training-set size, 6 vs 2 classes.
-3. **Do the models generalise?** Test on a different, human-labelled dataset (GoEmotions) and on Lithuanian sentences.
+3. **Do the models generalise?** Test on a different, human-labelled dataset (GoEmotions) and on Lithuanian: our 2,000 test texts machine-translated into Lithuanian, and 60 sentences of our own.
 4. **What do the models actually learn: keywords or context?** Keyword test (S13: the emotion word removed, or only the emotion word kept), keyword baseline, attention weights, negation, error analysis.
 
 The dataset is easy and the labels follow the emotion word (section 3), so the architectures may end up within a point of each other. If they do, that is a finding, not a failure: questions 3 and 4 then carry the study, and the report says so.
@@ -51,7 +51,7 @@ The dataset is easy and the labels follow the emotion word (section 3), so the a
 | Metrics | accuracy, loss | accuracy, loss, time | per-class precision/recall/F1, macro-F1, confusion matrix, train vs validation gap, parameters, train and inference time |
 | Context | – | – | baselines (majority 34.8 %, keyword rule 72.4 %) and competitor: DistilBERT fine-tuned by us, same metrics and test sets |
 | Data | ready | ready | own data-quality analysis (keyword labels, conflicts, leakage) |
-| Generalisation | – | – | GoEmotions (6,535 texts) and Lithuanian sentences |
+| Generalisation | – | – | GoEmotions (6,535 texts); Lithuanian: the 2,000 test texts translated + 60 own sentences |
 | Extra studies | depth, width, batch, epochs, activations, 3 optimisers × 4 rates (MNIST, Dense) | pooling, one-hot vs Embedding, LSTM/GRU units, layers, activation, optimiser (1 run each) | 9 optimisers × 5 rates on text models (5 seeds), masking, class weights vs focal loss, Dropout vs L2, depth, GloVe frozen vs fine-tuned, training-set size, binary vs 6 classes |
 | Interpretation | – | – | keyword test (emotion word removed / kept alone), attention heatmaps, error examples, negation subset |
 | Product | – | – | `predict.py` + a small web app: sentence in → emotion probabilities and the words the model looked at |
@@ -75,9 +75,20 @@ The dataset is easy and the labels follow the emotion word (section 3), so the a
 - We take the single-label texts whose label is one of our 6 emotions: **6,535 texts** (love 1,760, anger 1,265, joy 1,052, sadness 1,003, surprise 902, fear 553).
 - Preprocess like our data (lowercase, strip punctuation).
 
-### Lithuanian sentences (generalisation, fun part)
-- **Each of us writes 30 short sentences (5 per emotion)** plus our own English translation, 60 in total.
-- The trained models classify both versions. Expected result: the LT originals fail, the EN translations work. The model knows only its training language.
+### Lithuanian (generalisation to another language)
+Two Lithuanian sets, both used only for testing; the models are trained on English only.
+
+**LT test set from translation (main LT result, 2,000 texts).**
+- Source: [SkyWater21/lt_twitter_emotions](https://huggingface.co/datasets/SkyWater21/lt_twitter_emotions) (MIT), the whole CARER corpus, i.e. dair-ai/emotion "unsplit", 416,809 texts, machine-translated into Lithuanian with Google Translate. It keeps the English text and the same 6 labels.
+- Our test split is part of that corpus, so we keep the rows whose English text and label match our 2,000 test texts → `data/lt_test.csv` (`text_lt`, `text_en`, `label`). Texts that cannot be matched are counted and reported.
+- **Why it matters:** the same 2,000 texts with the same labels in both languages. The difference between English and Lithuanian accuracy is then the effect of the language alone, measured on enough texts for a meaningful number (±2 points instead of ±12 with 60 sentences).
+- **Limits, stated in the report:** machine translation, not natural Lithuanian ("translationese"); a translation can lose or change the emotion word.
+
+**Our own sentences (small, natural, 60 texts).**
+- **Each of us writes 30 short sentences (5 per emotion)** plus our own English translation → `lt_sentences.csv`.
+- They show the same effect on natural Lithuanian, and give clear examples for the report, the talk and the demo.
+
+Expected result for both: the Lithuanian versions fail (most words are unknown to the English vocabulary), the English versions work. The model knows only its training language.
 
 ### Binary version (study S5)
 Positive = joy, love, surprise; negative = sadness, anger, fear (45.2 % / 54.8 % in train). Surprise is debatable; say so in the report.
@@ -149,18 +160,18 @@ Studies are listed in the order they run. "Side models" = Conv1D and GRU, the be
 | S9 | Optimisers, each at its best S9a rate, side models, 5 seeds | – | 9 × 2 × 5 = 90 | B | B | 4.2 |
 | T0a | Tuning, size: one capacity setting × 3 values per model, protocol learning rate, seeds 1–2, pick by validation macro-F1 | – | 9 × 3 × 2 = 54 | B | each picks for own models | 4.3 |
 | T0b | Tuning, learning rate: protocol rate × 0.3 / × 3 at the chosen size (× 1 is T0a), all 10 models, seeds 1–2 | × 1 = T0a | 10 × 2 × 2 = 40 | B | each picks for own models | 4.3 |
-| **S1** | **Main comparison:** 10 tuned models. Also saves predictions for test, GoEmotions, LT/EN sentences and the two keyword-test versions of test (S13) | – | 10 × 5 = 50 | B | both | 4.4 |
+| **S1** | **Main comparison:** 10 tuned models. Also saves predictions for test, GoEmotions, the LT test set, LT/EN sentences and the two keyword-test versions of test (S13) | – | 10 × 5 = 50 | B | both | 4.4 |
 | S8 | Cost: parameters, s/epoch, training time, inference time per 1,000 texts → quality vs cost chart | – | from S1 | – | B | 4.4 |
 | S14 | Competitor: DistilBERT (`distil_bert_base_en_uncased`, 66M parameters) fine-tuned on the same train split, 3 epochs, learning rate 2e-5; same predictions as S1 | – | 3 seeds | B (same machine as S1, for the cost chart) | A | 4.4, 4.8, 4.9 |
 | S2 | Padding/masking: post padding without mask / pre padding without mask, for SimpleRNN, LSTM, GRU, BiLSTM | with mask = S1 | 4 × 2 × 5 = 40 | B | B | 4.5 |
 | S3 | Uneven classes: class weights (inverse frequency) for all 10 models; focal loss (γ = 2) for the side models | neither = S1 | 10 × 5 + 2 × 5 = 60 | B | B | 4.6 |
 | S10 | Regularisation: Dropout 0.2 / Dropout 0.5 before the output layer / L2 1e-4 on the weights, side models | none = S1 | 3 × 2 × 5 = 30 | B | B | 4.7 + appendix |
 | S11 | Depth: 2 stacked Conv1D / recurrent layers instead of 1, for Conv1D, LSTM, GRU | 1 layer = S1 | 3 × 5 = 15 | B | B | 4.7 + appendix |
-| S12 | Word vectors, all 100-dimensional: learned / GloVe frozen / GloVe fine-tuned, side models; also saves GoEmotions, LT/EN and keyword-test predictions | learned 64-d = S1 | 3 × 2 × 5 = 30 | A | A | 4.7 + appendix |
+| S12 | Word vectors, all 100-dimensional: learned / GloVe frozen / GloVe fine-tuned, side models; also saves GoEmotions, LT test, LT/EN and keyword-test predictions | learned 64-d = S1 | 3 × 2 × 5 = 30 | A | A | 4.7 + appendix |
 | S4 | Training-set size: 1k, 2k, 4k, 8k, 16k (stratified) for logreg, the best non-recurrent and the best recurrent model of S1 | – | 5 × 3 × 5 = 75 | A | A | 4.7 + appendix |
 | S5 | 2 classes vs 6 classes, all 10 models | 6 classes = S1 | 10 × 5 = 50 | A | A | 4.7 + appendix |
 | S13 | **Keywords or context?** Test texts with the emotion word (the word after *feel/feeling/felt*) replaced by an unknown word, and with only that word kept; reads the S1, S12 and S14 predictions, no retraining | original test | 0 | – | A | 4.8 |
-| S6 | Generalisation: reads the S1, S12 and S14 predictions for GoEmotions and LT/EN, no retraining | – | 0 | – | A | 4.9 |
+| S6 | Generalisation: reads the S1, S12 and S14 predictions for GoEmotions, the LT test set (2,000, same texts as test) and LT/EN sentences, no retraining | – | 0 | – | A | 4.9 |
 | S7 | Errors: confusion matrices, most-confused pairs, misclassified examples, negation subset, attention heatmaps | – | 0 | – | B | 4.10 |
 
 About 630 training runs, roughly 5–8 hours of CPU time for our models (side-model runs take ~20–60 s each) plus several hours for the 3 DistilBERT runs.
@@ -192,7 +203,7 @@ About 630 training runs, roughly 5–8 hours of CPU time for our models (side-mo
 
 **S14, competitor (DistilBERT fine-tuned by us):**
 - KerasHub `DistilBertClassifier` from the `distil_bert_base_en_uncased` preset (Sanh et al., 2019), fine-tuned on our train split with our validation set and EarlyStopping; texts cut at 64 word pieces; Adam 2e-5, batch 32, up to 3 epochs (the usual BERT fine-tuning settings), seeds 1–3.
-- Uses its own tokenizer, so it skips our `TextVectorization`; everything after the predictions (metrics, McNemar, cost, GoEmotions, LT/EN, keyword test) is shared with our models.
+- Uses its own tokenizer, so it skips our `TextVectorization`; everything after the predictions (metrics, McNemar, cost, GoEmotions, LT test, LT/EN, keyword test) is shared with our models.
 - Downloads the pretrained weights (~250 MB) once; kept out of git. Answers "how far are our 0.7M-parameter models from a 66M-parameter pretrained transformer, and at what cost?"
 
 **Robustness check, duplicates:** 11 test texts also appear in train (section 3). The main table also gives macro-F1 on the test set without them (`data.test_in_train`); if it barely changes, the leak does not matter, and the report says so with the number.
@@ -221,6 +232,8 @@ neuroniniai-tinklai-kd-2026/
   config.py            shared settings (section 4), class names in English and Lithuanian; learning rates from
                        S9a, sizes and learning rates from T0 are filled in here
   download_data.py     A: one-off script that created data/*.csv from Hugging Face
+  download_lt_test.py  B: one-off script: downloads the Lithuanian translation of the CARER corpus and keeps
+                       our 2,000 test texts → data/lt_test.csv (the 56 MB download itself is not kept)
   download_glove.py    A: one-off download of GloVe 6B 100-d into data/glove/ (git-ignored, ~330 MB) for S12
   data.py              A: loading, vectorising, pre/post padding, binary version, subsets, GoEmotions, LT, GloVe matrix,
                        keyword-test versions of the test set (S13), test texts that also appear in train
@@ -237,7 +250,7 @@ neuroniniai-tinklai-kd-2026/
   predict.py           A: command-line demo
   app.py               A: small web app (Gradio): sentence in → bar chart of emotion probabilities and the
                        sentence with words shaded by attention weight (best BiLSTM + attention model)
-  data/                emotion_{train,validation,test}.csv, goemotions_{train,validation,test}.csv, lt_sentences.csv
+  data/                emotion_{train,validation,test}.csv, goemotions_{train,validation,test}.csv, lt_test.csv, lt_sentences.csv
                        (original texts; cleaning and filtering happen in data.py)
   results/             results.csv, curves/, matrices/, predictions/, tables/, figures/,
                        models/best.keras (only the best model is committed; the rest and dev/ are git-ignored)
@@ -253,7 +266,8 @@ vectorize(d, mode="sequence", padding="post") -> dict
     # mode "sequence" → (n, 50) int; "multi_hot" → (n, 10000); vocabulary from train only; padding "pre" for S2
     # also returns the fitted "vectorizer"; encode(vectorizer, texts, mode, padding) encodes any other texts
 load_goemotions(task="6") -> (x, y)
-load_lt() -> (x_lt, x_en, y)
+load_lt() -> (x_lt, x_en, y)                    # our own 60 sentences
+load_lt_test(task="6") -> (x_lt, x_en, y)       # the 2,000 test texts translated (data/lt_test.csv); cleaned like the rest
 glove_matrix(vectorizer, dim=100) -> np.array   # (VOCAB_SIZE, 100); row i = GloVe vector of word i, zeros if missing (S12)
 keyword_variants(texts) -> dict                 # S13: "without" (keyword → out-of-vocabulary word), "only" (keyword alone),
                                                 #      "keyword" (the word or ""), "has_keyword" (bool per text)
@@ -291,7 +305,7 @@ python app.py                    # web demo on http://localhost:7860
 - validation: `val_acc`, `val_loss`, `val_macro_f1`
 - test: `test_acc`, `test_loss`, `test_macro_f1`, `f1_sadness` … `f1_surprise` (binary runs: `f1_negative`, `f1_positive`)
 
-Predictions for every text are saved per run in `predictions/` (test; in S1, S12 and S14 also GoEmotions, LT/EN and the two keyword-test copies of test), which S6, S7, S13 and McNemar need. `lr` holds the learning rate actually used, so per-model rates from T0b show in every row.
+Predictions for every text are saved per run in `predictions/` (test; in S1, S12 and S14 also GoEmotions, the LT test set, LT/EN and the two keyword-test copies of test), which S6, S7, S13 and McNemar need. `lr` holds the learning rate actually used, so per-model rates from T0b show in every row.
 
 New packages: `keras-hub` (S14) and `gradio` (app); both go into `requirements.txt` with exact versions.
 
@@ -326,6 +340,7 @@ Phases overlap. Writing that needs no results (literature, model theory) starts 
 | 1.3 | `train.py` + `run_study.py` | B | 1.1, 1.2 | `python train.py --model logreg --seed 1 --dev` writes a row, curve and matrix | ✅ also tested: S1 extras (GoEmotions, LT/EN, saved model), no mask, pre padding, class weights, binary task, `run_study.py` skips finished runs. `models_a.py` starts with logreg; model keys in `train.FAMILIES` |
 | 1.4 | `data_analysis.py`: class and length plots, quality checks, majority and keyword baselines | A | 1.1 | figures and numbers for 4.1 | 🟡 tables done (classes, vocabulary, length, dataset overview, GoEmotions filter); plots, quality checks (feel-words, conflicts, leakage) and baselines still to do |
 | 1.5 | LT sentences: 30 each (5 per emotion) + English translations → `lt_sentences.csv` | both | – | 60 rows | 🟡 file format set, 2 example rows of 60 |
+| 1.8 | LT test set: `download_lt_test.py` → `data/lt_test.csv` (our test texts matched by English text and label, unmatched ones counted), `data.load_lt_test`, and S1/S12 save its predictions | B (small `data.py` function agreed with A) | 1.1 | ~2,000 rows, a few rows checked by eye; `--dev` S1 run saves `p_lt_test` |  |
 | 1.6 | `data.py`: `keyword_variants` (S13) and `test_in_train` (duplicates check), each checked on a few hand-made examples | A | 1.1 | functions match section 7 |  |
 | 1.7 | Code for the review additions: `evaluation.holm` (checked on a hand example), per-model learning rate in `train.py` (`config.MODEL_LEARNING_RATES`), T0a/T0b in `run_study.py`, keyword-test predictions in S1/S12 | B | 1.6 for the keyword predictions | tested in `--dev` | ✅ Holm checked by hand in `python evaluation.py`; S1 variant names stay the same when the T0b rate is used (the rate is in the `lr` column); T0b refuses to start before `MODEL_SIZES` is filled; S1/S12 save `p_kw_without`, `p_kw_only`, `kw_has` and refuse to start until `data.keyword_variants` (1.6) exists. Tested with a stand-in for 1.6 |
 
@@ -340,7 +355,7 @@ Phases overlap. Writing that needs no results (literature, model theory) starts 
 ### Phase 3 — Experiments
 | # | Step | Owner | Needs | Done when | Status |
 |---|---|---|---|---|---|
-| 3.1 | S1 main comparison (saves predictions incl. keyword-test copies + best model) | B | 2.4, 1.5, 1.6 | 50 S1 rows, predictions committed |  |
+| 3.1 | S1 main comparison (saves predictions incl. keyword-test copies and LT test + best model) | B | 2.4, 1.5, 1.6, 1.8 | 50 S1 rows, predictions committed |  |
 | 3.2 | S2 masking, S3 class weights + focal loss | B | 3.1 | rows in CSV |  |
 | 3.3 | S4 training-set size, S5 binary | A | 3.1 (S4 needs the best models of S1) | rows in CSV |  |
 | 3.4 | S10 regularisation, S11 depth | B | 2.4 | rows in CSV |  |
@@ -406,7 +421,7 @@ Character counts are targets with spaces. "Drafter" writes the first version; th
 | **3. METODIKA** (9–10 p., 30–35 %) | | **17,900** | |
 | 3.1 Tyrimo eiga, protokolas ir programos algoritmas | B | 1,400 | pipeline diagram, fixed settings, seeds, one change at a time; why hold-out validation, batch 64, stopping on val_loss vs choosing on macro-F1 (section 6) |
 | 3.2 Kuriamo produkto struktūra | A | 700 + diagram | modules (`data` → `train` → `evaluation` → `compare`) and the `predict.py` tool: sentence in → cleaning → vectorizer → saved model → probabilities out |
-| 3.3 Duomenų rinkiniai ir jų kokybė | A | 1,800 | emotion, GoEmotions, LT sentences; quality issues |
+| 3.3 Duomenų rinkiniai ir jų kokybė | A | 1,800 | emotion, GoEmotions, LT test from translation and own LT sentences; quality issues |
 | 3.4 Teksto paruošimas ir kodavimas | A | 1,100 | tokenisation, sequence length 50 (coverage + IQR rule), padding, multi-hot, embedding, GloVe |
 | 3.5.1–3.5.5 A's models | A | 5 × 700 | logreg, MLP, Embedding, Conv1D, Transformer |
 | 3.5.6–3.5.10 B's models | B | 5 × 700 | SimpleRNN, LSTM, GRU, BiLSTM, BiLSTM + attention |
@@ -424,7 +439,7 @@ Character counts are targets with spaces. "Drafter" writes the first version; th
 | 4.6 Klasių disbalanso įtaka | B | 1,000 | S3: per-class F1 without / with class weights / with focal loss |
 | 4.7 Kitų mokymo pasirinkimų įtaka | B (S10, S11) + A (S12, S4, S5) | 1,500 + summary table | one table: each side study, its best setting and the change vs S1 (mean ± std); 2–3 sentences each on regularisation, depth, GloVe, training-set size, binary vs 6 classes; figures and full tables in the appendices |
 | 4.8 Raktiniai žodžiai ar kontekstas? | A | 1,400 | S13: accuracy and macro-F1 without the keyword / with only the keyword, per model, vs the keyword rule and DistilBERT; attention share on the keyword |
-| 4.9 Apibendrinimas kitiems duomenims | A | 1,100 | GoEmotions drop (our models, GloVe, DistilBERT), LT vs EN |
+| 4.9 Apibendrinimas kitiems duomenims | A | 1,100 | GoEmotions drop (our models, GloVe, DistilBERT); LT vs EN on the same 2,000 test texts; own LT sentences as examples |
 | 4.10 Klaidų analizė ir dėmesio vizualizacija | B | 1,200 | confusion matrices, examples, negation, heatmaps |
 | 4.11 Emocijų atpažinimo įrankis | A | 600 | the web app (screenshot), how it is built (3.2), what it shows |
 | **5. IŠVADOS** (1–2 p., 5 %) | drafter B, both | 2,400 | one numbered conclusion per task, each with a number |
@@ -503,7 +518,7 @@ Kiekvienas narys aprašė savo modelius teorinėje ir metodinėje dalyse. Įvad�
 | 8 | Quality vs cost (DistilBERT: 66M parameters vs our ~0.7M) | B |
 | 9 | Training choices: masking finding, class weights vs focal loss, and the 4.7 summary table | B |
 | 10 | **Keywords or context?** The keyword test: accuracy without the emotion word / with only it | A |
-| 11 | Generalisation: GoEmotions, Lithuanian sentences | A |
+| 11 | Generalisation: GoEmotions; Lithuanian (2,000 translated test texts + own sentences) | A |
 | 12 | Attention heatmaps and typical errors | B |
 | 13 | Demo: the web app, live or screenshot | A |
 | 14 | Conclusions | B |
@@ -521,6 +536,7 @@ Each person must also be able to answer questions about the other's part at a ba
 - Acheampong, F. A., Wenyu, C., Nunoo-Mensah, H. (2020). Text-based emotion detection: Advances, challenges, and opportunities. *Engineering Reports*, 2(7).
 - Alswaidan, N., Menai, M. E. B. (2020). A survey of state-of-the-art approaches for emotion recognition in text. *Knowledge and Information Systems*, 62.
 - Mohammad, S., Turney, P. (2013). Crowdsourcing a word–emotion association lexicon. *Computational Intelligence*, 29(3). (NRC EmoLex; existing tools in 3.6)
+- SkyWater21. *lt_twitter_emotions* (Lithuanian machine translation of the CARER corpus), Hugging Face dataset, MIT licence. https://huggingface.co/datasets/SkyWater21/lt_twitter_emotions (LT test set; cite as a dataset with the access date)
 
 **Text representation**
 - Mikolov, T. et al. (2013). Efficient estimation of word representations in vector space. arXiv:1301.3781.

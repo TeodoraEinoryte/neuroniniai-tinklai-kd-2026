@@ -17,6 +17,11 @@ VOCAB_SIZE = 10000
 SEQUENCE_LENGTH = 50
 
 EMBEDDING_DIM = 64
+
+# Sequence models use the padding mask (Embedding(mask_zero=True)), except these. The Transformer was better
+# without it on validation (90.8 % vs 85.9 % and 88.6 % with the mask, seeds 1 and 2; step 2.1); S2 measures it.
+NO_MASK_MODELS = ["transformer"]
+
 # Optimiser of every run except S9; S9 compares 8 optimisers and may replace this choice before T0 (step 2.3)
 OPTIMIZER = "adam"
 LEARNING_RATE = 0.001

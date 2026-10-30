@@ -3,7 +3,7 @@
 Run: python run_study.py S1 [--dev]
 Runs already in results.csv are skipped, so an interrupted study can simply be started again.
 Each study changes one thing; everything else stays as in config.py. Where a study's baseline is
-the protocol itself (e.g. "with mask" in S2, "dropout 0" in S10), it is not run again: compare.py reads it from S1.
+the protocol itself (e.g. the RNNs "with mask" in S2, "dropout 0" in S10), it is not run again: compare.py reads it from S1.
 """
 import argparse
 import os
@@ -52,9 +52,11 @@ def study_runs(study):
     if study == "S1":
         return [dict(model=m, seed=s) for m in models for s in seeds]
     if study == "S2":
-        # post padding without mask / pre padding without mask; "with mask" is S1
+        # RNNs: post padding without mask / pre padding without mask; "with mask" is S1.
+        # Transformer the other way round: its protocol is without the mask (config.NO_MASK_MODELS), so S2 adds "with mask"
         variants = [dict(mask=False), dict(mask=False, padding="pre")]
-        return [dict(model=m, seed=s, **v) for m in RNN_MODELS for v in variants for s in seeds]
+        return ([dict(model=m, seed=s, **v) for m in RNN_MODELS for v in variants for s in seeds]
+                + [dict(model="transformer", seed=s, mask=True) for s in seeds])
     if study == "S3":
         # class weights for every model + focal loss for the two side models; "neither" is S1
         return ([dict(model=m, seed=s, class_weight=True) for m in models for s in seeds]

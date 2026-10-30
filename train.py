@@ -1,6 +1,6 @@
 """One training run -> one row in results.csv + learning curve + confusion matrix + predictions.
 
-Run: python train.py --model lstm --seed 1 --study S1 [--size 64] [--no-mask] [--padding pre]
+Run: python train.py --model lstm --seed 1 --study S1 [--size 64] [--no-mask | --mask] [--padding pre]
                      [--class-weight] [--loss focal] [--fraction 0.25] [--task 2] [--optimizer sgd --lr 0.1]
                      [--dropout 0.5] [--l2 0.0001] [--layers 2] [--embedding glove-frozen] [--dev]
 Everything not given on the command line comes from config.py (PLAN.md, section 4).
@@ -46,7 +46,7 @@ FAMILIES = {
 # What a study may change; everything else stays as in config.py. None = the protocol value.
 DEFAULTS = {
     "size": None,             # T0: hidden units / filters / heads; None = config.MODEL_SIZES or the middle T0 value
-    "mask": True,             # S2: Embedding(mask_zero=True)
+    "mask": None,             # S2: Embedding(mask_zero=True); None = True, except config.NO_MASK_MODELS
     "padding": "post",        # S2: zeros after ("post") or before ("pre") the text
     "class_weight": False,    # S3: inverse class frequency weights
     "loss": "crossentropy",   # S3: "focal" = focal loss
@@ -193,10 +193,12 @@ def settings(model, **options):
     o = {**DEFAULTS, **{k: v for k, v in options.items() if v is not None}}
     # S9 and T0b set the optimiser or learning rate themselves; that shows in the variant name
     optimizer_given = o["optimizer"] is not None or o["lr"] is not None
+    default_mask = model not in config.NO_MASK_MODELS
+    o["mask"] = default_mask if o["mask"] is None else o["mask"]
     o["size"] = _pick_size(model, o["size"], MODELS[model][2])
     o["optimizer"] = o["optimizer"] or config.OPTIMIZER
     o["lr"] = o["lr"] or config.MODEL_LEARNING_RATES.get(model, config.LEARNING_RATE)
-    return o, _variant(o, optimizer_given)
+    return o, _variant(o, optimizer_given, default_mask)
 
 
 def _model_extras(o, vectorizer):
@@ -221,13 +223,14 @@ def _pick_size(model, size, t0_values):
     return t0_values[len(t0_values) // 2] if t0_values else None
 
 
-def _variant(o, optimizer_given):
+def _variant(o, optimizer_given, default_mask):
     """Short name for what this run changes, e.g. "size64", "size64-nomask-pre" or "size64-sgd-lr0.1";
-    also used in file names. The optimiser and learning rate appear only when the run set them (S9, T0b);
+    also used in file names. The mask appears only when it differs from the model's default ("nomask", or
+    "mask" for the Transformer); the optimiser and learning rate only when the run set them (S9, T0b);
     the learning rate actually used is always in the lr column of results.csv."""
     parts = [f"size{o['size']}" if o["size"] is not None else "base"]
-    if not o["mask"]:
-        parts.append("nomask")
+    if o["mask"] != default_mask:
+        parts.append("mask" if o["mask"] else "nomask")
     if o["padding"] == "pre":
         parts.append("pre")
     if o["class_weight"]:
@@ -281,7 +284,8 @@ def main():
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--study", default="dev", help="S9a, S9, T0a, T0b, S1, ...; goes into results.csv and file names")
     parser.add_argument("--size", type=int, help="tuned setting; default: config.MODEL_SIZES or the middle T0 value")
-    parser.add_argument("--no-mask", action="store_true", help="Embedding without mask_zero (S2)")
+    parser.add_argument("--mask", action=argparse.BooleanOptionalAction,
+                        help="--no-mask: Embedding without mask_zero; --mask: Transformer with the mask (S2)")
     parser.add_argument("--padding", choices=["post", "pre"], help="zeros after or before the text (S2)")
     parser.add_argument("--class-weight", action="store_true", help="inverse class frequency weights (S3)")
     parser.add_argument("--loss", choices=["crossentropy", "focal"], help="focal loss (S3)")
@@ -296,7 +300,6 @@ def main():
     parser.add_argument("--dev", action="store_true", help="quick check: 2,000 texts, 3 epochs, results/dev/")
     args = vars(parser.parse_args())
     model, seed, study, dev = args.pop("model"), args.pop("seed"), args.pop("study"), args.pop("dev")
-    args["mask"] = not args.pop("no_mask")
     args["class_weight"] = args.pop("class_weight") or None
     run(model, seed, study, dev, **args)
 

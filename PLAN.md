@@ -95,7 +95,7 @@ Positive = joy, love, surprise; negative = sadness, anger, fear (45.2 % / 54.8 %
 | Tokenisation | `TextVectorization`, vocabulary 10,000, adapted on **train only** |
 | Sequence length | 50 tokens (98.7 % of train texts fit whole; `length_coverage.csv`) |
 | Embedding size | 64, learned (S12: 100-d learned or GloVe) |
-| Masking | `Embedding(mask_zero=True)` for sequence models (except where S2 changes it) |
+| Masking | `Embedding(mask_zero=True)` for sequence models (except where S2 changes it). Exceptions: Conv1D (fixed windows, no use for a mask) and the Transformer, which was better without the mask on validation (step 2.1); listed in `config.NO_MASK_MODELS` |
 | Optimiser | Adam, learning rate 0.001 (`config.OPTIMIZER`). One optimiser for every run; S9 checks this choice before T0 and may replace it (step 2.3) |
 | Learning rate | per model, tuned in T0b around the protocol rate (× 0.3 / × 1 / × 3), in `config.MODEL_LEARNING_RATES`; until then the protocol rate |
 | Loss | sparse categorical cross-entropy, softmax output (S3: focal loss) |
@@ -143,6 +143,7 @@ Not models we train, but points of comparison:
 | BiLSTM + attention, unmasked | 89.1 % / 0.834 |
 
 - **Without masking:** LSTM collapsed to 34.9 % and SimpleRNN to 51.0 %. That's the origin of S2.
+- **The Transformer goes the other way (step 2.1, full data):** with the padding mask (attention only to real words, average over real words) validation 85.9 % and 88.6 % (seeds 1, 2), test 86.5 % / 0.808 and 88.0 %; without it validation 90.8 %, test 90.0 % / 0.851 (seed 1). A likely reason: without the mask the padding positions give attention a place to put weight when no word matters (an "attention sink"), and their learned position vectors carry the text length. So the protocol runs the Transformer without the mask, and S2 measures it with the mask (5 seeds).
 - **Time:** all models together train in ~3 min on CPU.
 
 ## 6. Experiments
@@ -158,7 +159,7 @@ Studies are listed in the order they run. "Side models" = Conv1D and GRU, the be
 | **S1** | **Main comparison:** 10 tuned models. Also saves predictions for test, GoEmotions, the LT test set and the two keyword-test versions of test (S13) | – | 10 × 5 = 50 | B | both | 4.4 |
 | S8 | Cost: parameters, s/epoch, training time, inference time per 1,000 texts → quality vs cost chart | – | from S1 | – | B | 4.4 |
 | S14 | Competitor: DistilBERT (`distil_bert_base_en_uncased`, 66M parameters) fine-tuned on the same train split, 3 epochs, learning rate 2e-5; same predictions as S1 | – | 3 seeds | B (same machine as S1, for the cost chart) | A | 4.4, 4.8, 4.9 |
-| S2 | Padding/masking: post padding without mask / pre padding without mask, for SimpleRNN, LSTM, GRU, BiLSTM | with mask = S1 | 4 × 2 × 5 = 40 | B | B | 4.5 |
+| S2 | Padding/masking: post padding without mask / pre padding without mask, for SimpleRNN, LSTM, GRU, BiLSTM; and the Transformer **with** the mask (its protocol is without, step 2.1) | protocol = S1 | 4 × 2 × 5 + 5 = 45 | B | B | 4.5 |
 | S3 | Uneven classes: class weights (inverse frequency) for all 10 models; focal loss (γ = 2) for the side models | neither = S1 | 10 × 5 + 2 × 5 = 60 | B | B | 4.6 |
 | S10 | Regularisation: Dropout 0.2 / Dropout 0.5 before the output layer / L2 1e-4 on the weights, side models | none = S1 | 3 × 2 × 5 = 30 | B | B | 4.7 + appendix |
 | S11 | Depth: 2 stacked Conv1D / recurrent layers instead of 1, for Conv1D, LSTM, GRU | 1 layer = S1 | 3 × 5 = 15 | B | B | 4.7 + appendix |
@@ -283,7 +284,7 @@ holm(p_values, alpha=0.05) -> np.array   # bool per test: still significant afte
 ```
 
 ```bash
-python train.py --model lstm --seed 1 --study S1 [--size 64] [--no-mask] [--padding pre]
+python train.py --model lstm --seed 1 --study S1 [--size 64] [--no-mask | --mask] [--padding pre]
                 [--class-weight] [--loss focal] [--fraction 0.25] [--task 2] [--optimizer sgd --lr 0.1]
                 [--dropout 0.5] [--l2 0.0001] [--layers 2] [--embedding glove-frozen] [--dev]
 python run_study.py S2           # all runs of one study (S9a, S9, T0a, T0b, S1–S5, S10–S12)
@@ -342,7 +343,7 @@ Phases overlap. Writing that needs no results (literature, model theory) starts 
 ### Phase 2 — Models
 | # | Step | Owner | Needs | Done when | Status |
 |---|---|---|---|---|---|
-| 2.1 | `models_a.py`: 5 models; Conv1D also takes the side-study arguments (section 7) | A | 1.3 | each trains via `train.py --dev`, Conv1D also with `--dropout`, `--l2`, `--layers 2`, `--embedding learned100` |  |
+| 2.1 | `models_a.py`: 5 models; Conv1D also takes the side-study arguments (section 7) | A (done by B) | 1.3 | each trains via `train.py --dev`, Conv1D also with `--dropout`, `--l2`, `--layers 2`, `--embedding learned100` | ✅ `python models_a.py` checks parameter counts against the formulas (logreg 60,006, MLP 640,454, Embedding 644,550, Conv1D 681,862, Transformer 677,062, the same for 1/2/4 heads); `--dev` runs and saved-model loading pass, Conv1D also with the side-study options. Full-data check (seed 1), test accuracy / macro-F1: MLP 88.9 % / 0.837, Embedding 86.3 % / 0.805, Conv1D 91.7 % / 0.871, Transformer without mask 90.0 % / 0.851 vs with mask 86.5 % / 0.808 (seed 2: 88.0 %). So the Transformer runs without the mask (`config.NO_MASK_MODELS`, section 4; `train.py --mask` turns it on, and the variant name shows "mask" only when it differs from the model's default); S2 has a Transformer-with-mask arm (45 runs) |
 | 2.2 | `models_b.py`: 5 models; the attention model can output word weights; GRU takes the side-study arguments, LSTM takes `layers` | B | 1.3 | each trains via `train.py --dev`, GRU also with the side-study options | ✅ all 5 take every side-study argument; `python models_b.py` checks parameter counts against the lecture 8 formulas; full-data check (seed 1): GRU 92.4 % / 0.881, BiLSTM + attention 92.2 % / 0.874; `attention_weights()` works on the saved model (padding gets weight 0) |
 | 2.3 | S9a + S9 optimisers on Conv1D and GRU; best rates → `config.S9_LEARNING_RATES`; main optimiser by the rule in section 6 (👤 both) | B | Conv1D from 2.1, GRU from 2.2 | 180 S9a/S9 rows, `config.OPTIMIZER` and `LEARNING_RATE` confirmed or changed |  |
 | 2.4 | T0 tuning: T0a sizes, then T0b learning rates; B runs both for all models; each owner picks own sizes and rates → `config.py` | run B, pick each | 2.1, 2.2, 2.3, 1.7 | T0a and T0b rows in CSV, `MODEL_SIZES` and `MODEL_LEARNING_RATES` in `config.py` |  |
@@ -430,7 +431,7 @@ Character counts are targets with spaces. "Drafter" writes the first version; th
 | 4.2 Optimizatoriaus ir mokymosi greičio parinkimas | B | 1,100 | S9a heatmap (optimiser × rate), S9 table (mean ± std, Conv1D vs GRU), which optimiser the protocol keeps |
 | 4.3 Hiperparametrų parinkimas | drafter B | 700 + table | T0a sizes, T0b learning rates per model; full tables in appendix |
 | 4.4 Modelių palyginimas | drafter B, A adds | 2,400 | main table (mean ± std) with DistilBERT (S14) and the baselines, bar chart, McNemar with Holm, duplicates check, quality vs cost (S8) |
-| 4.5 Užpildymo ir kaukės įtaka | B | 1,000 | S2 table, explanation via hidden state |
+| 4.5 Užpildymo ir kaukės įtaka | B | 1,000 | S2 table, explanation via hidden state; the Transformer as the opposite case (the mask hurts it, see section 5) |
 | 4.6 Klasių disbalanso įtaka | B | 1,000 | S3: per-class F1 without / with class weights / with focal loss |
 | 4.7 Kitų mokymo pasirinkimų įtaka | B (S10, S11) + A (S12, S4, S5) | 1,500 + summary table | one table: each side study, its best setting and the change vs S1 (mean ± std); 2–3 sentences each on regularisation, depth, GloVe, training-set size, binary vs 6 classes; figures and full tables in the appendices |
 | 4.8 Raktiniai žodžiai ar kontekstas? | A | 1,400 | S13: accuracy and macro-F1 without the keyword / with only the keyword, per model, vs the keyword rule and DistilBERT; attention share on the keyword |

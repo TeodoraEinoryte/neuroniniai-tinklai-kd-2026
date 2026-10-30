@@ -120,6 +120,9 @@ def run(model, seed, study, dev=False, **options):
                       class_weight=_class_weights(d["y_train"], n_classes) if o["class_weight"] else None,
                       verbose=2)
     train_time = time.time() - start
+    # The epoch EarlyStopping went back to (lowest val_loss). Taken from Keras, not from the history: when a large
+    # learning rate makes the loss NaN (S9a), np.argmin would point at the first NaN epoch instead
+    best_epoch = stop.best_epoch + 1
 
     # All three sets with the restored (best) weights; train vs validation shows overfitting
     train_loss, train_acc = net.evaluate(d["x_train"], y["y_train"], batch_size=config.BATCH_SIZE, verbose=0)
@@ -139,7 +142,7 @@ def run(model, seed, study, dev=False, **options):
         "study": study, "model": model, "family": FAMILIES.get(model, ""), "variant": variant,
         "seed": seed, "machine": platform.node(), "optimizer": o["optimizer"], "lr": o["lr"],
         "params": net.count_params(), "epochs": len(history.history["loss"]),
-        "best_epoch": int(np.argmin(history.history["val_loss"])) + 1,   # the epoch EarlyStopping restored
+        "best_epoch": best_epoch,
         "train_time_s": round(train_time, 1), "predict_ms_1000": round(predict_ms_1000, 1),
         "train_acc": round(train_acc, 4), "train_loss": round(train_loss, 4),
         "val_acc": round(val_acc, 4), "val_loss": round(val_loss, 4), "val_macro_f1": round(val_metrics["macro_f1"], 4),
@@ -151,7 +154,7 @@ def run(model, seed, study, dev=False, **options):
 
     # Files of this run, all named by run_id
     title = f"{model} ({variant}), sėkla {seed}"
-    evaluation.plot_learning_curves(history.history, title, _path(out, "curves", f"{run_id}.png"))
+    evaluation.plot_learning_curves(history.history, best_epoch, title, _path(out, "curves", f"{run_id}.png"))
     evaluation.plot_confusion_matrix(evaluation.confusion_matrix(d["y_test"], p_test, n_classes), class_names,
                                      f"{title}, testavimo imtis", _path(out, "matrices", f"{run_id}.png"))
 

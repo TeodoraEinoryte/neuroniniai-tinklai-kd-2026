@@ -71,8 +71,9 @@ def holm(p_values, alpha=0.05):
     return significant
 
 
-def plot_learning_curves(history, title, path):
-    """Accuracy and loss per epoch for train and validation; history = keras History.history."""
+def plot_learning_curves(history, best, title, path):
+    """Accuracy and loss per epoch for train and validation; history = keras History.history,
+    best = the epoch EarlyStopping went back to (marked with a dashed line). NaN epochs are not drawn."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.8))
     epochs = range(1, len(history["loss"]) + 1)
     ax1.plot(epochs, history["accuracy"], label="mokymo")
@@ -80,7 +81,6 @@ def plot_learning_curves(history, title, path):
     ax1.set_title("Bendras tikslumas")
     ax2.plot(epochs, history["loss"], label="mokymo")
     ax2.plot(epochs, history["val_loss"], label="validavimo")
-    best = int(np.argmin(history["val_loss"])) + 1   # the epoch EarlyStopping restores
     ax2.axvline(best, color="gray", linestyle="--", linewidth=1, label=f"min. val. nuostoliai ({best} ep.)")
     ax2.set_title("Nuostoliai")
     for ax in (ax1, ax2):

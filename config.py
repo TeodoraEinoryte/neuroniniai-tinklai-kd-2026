@@ -17,11 +17,20 @@ VOCAB_SIZE = 10000
 SEQUENCE_LENGTH = 50
 
 EMBEDDING_DIM = 64
-LEARNING_RATE = 0.001   # Adam
+# Optimiser of every run except S9; S9 compares 8 optimisers and may replace this choice before T0 (step 2.3)
+OPTIMIZER = "adam"
+LEARNING_RATE = 0.001
 BATCH_SIZE = 64
 EPOCHS = 30             # upper limit; EarlyStopping usually stops earlier
 PATIENCE = 3            # EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True)
 SEEDS = [1, 2, 3, 4, 5] # for keras.utils.set_random_seed
+
+# Size chosen in T0 for each model, e.g. {"lstm": 64}; filled at step 2.4.
+# Until then train.py uses the middle T0 value.
+MODEL_SIZES = {}
+
+# S9: best learning rate of each optimiser from the S9a grid, e.g. {"sgd": 0.1}; filled at step 2.3
+S9_LEARNING_RATES = {}
 
 DATA_DIR = "data"
 RESULTS_DIR = "results"

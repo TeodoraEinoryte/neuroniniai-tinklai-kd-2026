@@ -19,7 +19,7 @@ S4_FRACTIONS = [1 / 16, 1 / 8, 1 / 4, 1 / 2, 1.0]                    # 1k, 2k, 4
 S4_MODELS = ["logreg"]       # + the best non-recurrent and the best recurrent model, added after S1 (PLAN.md, S4)
 SIDE_MODELS = ["conv1d", "gru"]                  # S9, S10, S12, focal loss: best non-recurrent and recurrent of the pilot
 S9_LEARNING_RATES = [1.0, 0.1, 0.01, 0.001, 0.0001]   # the same grid for every optimiser (S9a); 1.0 is Adadelta's usual rate
-STUDIES = ["S9a", "S9", "T0", "S1", "S2", "S3", "S4", "S5", "S10", "S11", "S12"]
+STUDIES = ["S9a", "S9", "T0a", "T0b", "S1", "S2", "S3", "S4", "S5", "S10", "S11", "S12"]
 
 
 def study_runs(study):
@@ -37,10 +37,18 @@ def study_runs(study):
             raise ValueError(f"Fill config.S9_LEARNING_RATES from the S9a results first; missing: {missing}")
         return [dict(model=m, seed=s, optimizer=o, lr=config.S9_LEARNING_RATES[o])
                 for m in SIDE_MODELS for o in train.OPTIMIZERS for s in seeds]
-    if study == "T0":
-        # every tuned model x its 3 sizes x seeds 1-2; picked by validation macro-F1 (step 2.4)
+    if study == "T0a":
+        # every tuned model x its 3 sizes x seeds 1-2, protocol learning rate; picked by validation macro-F1 (step 2.4)
         return [dict(model=m, seed=s, size=size)
                 for m in models for size in train.MODELS[m][2] for s in T0_SEEDS]
+    if study == "T0b":
+        # every model at its T0a size x learning rates LEARNING_RATE x 0.3 and x 3 (x 1 is the T0a run) x seeds 1-2
+        missing = [m for m in models if train.MODELS[m][2] and m not in config.MODEL_SIZES]
+        if missing:
+            raise ValueError(f"Fill config.MODEL_SIZES from the T0a results first; missing: {missing}")
+        rates = [round(config.LEARNING_RATE * f, 10) for f in config.T0B_FACTORS]
+        return [dict(model=m, seed=s, size=config.MODEL_SIZES.get(m), lr=lr)
+                for m in models for lr in rates for s in T0_SEEDS]
     if study == "S1":
         return [dict(model=m, seed=s) for m in models for s in seeds]
     if study == "S2":

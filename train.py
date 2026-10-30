@@ -53,7 +53,8 @@ DEFAULTS = {
     "fraction": 1.0,          # S4: stratified share of train
     "task": "6",              # S5: "2" = positive/negative
     "optimizer": None,        # S9: name from OPTIMIZERS; None = config.OPTIMIZER
-    "lr": None,               # S9: learning rate; None = config.LEARNING_RATE
+    "lr": None,               # S9, T0b: learning rate; None = the model's rate from T0b (config.MODEL_LEARNING_RATES),
+                              #   or config.LEARNING_RATE before T0b
     "dropout": None,          # S10: Dropout rate before the output layer; None = the model's own default
     "l2": None,               # S10: L2 penalty on the weights
     "layers": None,           # S11: number of Conv1D / recurrent layers; None = 1
@@ -89,11 +90,17 @@ def run(model, seed, study, dev=False, **options):
     fraction = min(o["fraction"], DEV_FRACTION) if dev else o["fraction"]
     n_classes = 2 if o["task"] == "2" else 6
     class_names = config.CLASSES_BINARY_LT if o["task"] == "2" else config.CLASSES_LT
+    if study in ("S1", "S12"):
+        try:   # checked before training, so a missing step 1.6 does not waste a run
+            from data import keyword_variants
+        except ImportError:
+            raise ImportError("S1 and S12 need data.keyword_variants (step 1.6) for the keyword test") from None
     print(f"\n=== {run_id} ===")
 
     # The same seed gives the same train subset, initial weights and batch order
     keras.utils.set_random_seed(seed)
-    d = vectorize(load_emotion(o["task"], fraction, seed), mode, o["padding"])
+    texts = load_emotion(o["task"], fraction, seed)
+    d = vectorize(texts, mode, o["padding"])
 
     net = build(size=o["size"], mask=o["mask"], n_classes=n_classes, **_model_extras(o, d["vectorizer"]))
     # Focal loss needs one-hot labels; cross-entropy works with the class numbers directly
@@ -154,9 +161,15 @@ def run(model, seed, study, dev=False, **options):
         # with the vocabulary of this run (built from train only)
         x_go, y_go = load_goemotions(o["task"])
         x_lt, x_en, y_lt = load_lt(o["task"])
-        for name, texts, labels in [("go", x_go, y_go), ("lt", x_lt, y_lt), ("en", x_en, y_lt)]:
-            prob = _predict(net, encode(d["vectorizer"], texts, mode, o["padding"]))
+        for name, other, labels in [("go", x_go, y_go), ("lt", x_lt, y_lt), ("en", x_en, y_lt)]:
+            prob = _predict(net, encode(d["vectorizer"], other, mode, o["padding"]))
             predictions.update({f"y_{name}": labels, f"p_{name}": prob.argmax(axis=1), f"prob_{name}": prob})
+        # S13 keyword test: the same test texts without the emotion word, and with only that word
+        kw = keyword_variants(texts["x_test"])
+        for name in ["without", "only"]:
+            prob = _predict(net, encode(d["vectorizer"], kw[name], mode, o["padding"]))
+            predictions.update({f"p_kw_{name}": prob.argmax(axis=1), f"prob_kw_{name}": prob})
+        predictions["kw_has"] = kw["has_keyword"]       # texts with no feel-word are the same in all versions
     if study == "S1":
         net.save(_path(out, "models", f"{run_id}.keras"))
     np.savez_compressed(_path(out, "predictions", f"{run_id}.npz"), **predictions)
@@ -177,10 +190,12 @@ def settings(model, **options):
     if unknown:
         raise ValueError(f"Unknown options: {unknown}")
     o = {**DEFAULTS, **{k: v for k, v in options.items() if v is not None}}
+    # S9 and T0b set the optimiser or learning rate themselves; that shows in the variant name
+    optimizer_given = o["optimizer"] is not None or o["lr"] is not None
     o["size"] = _pick_size(model, o["size"], MODELS[model][2])
     o["optimizer"] = o["optimizer"] or config.OPTIMIZER
-    o["lr"] = o["lr"] or config.LEARNING_RATE
-    return o, _variant(o)
+    o["lr"] = o["lr"] or config.MODEL_LEARNING_RATES.get(model, config.LEARNING_RATE)
+    return o, _variant(o, optimizer_given)
 
 
 def _model_extras(o, vectorizer):
@@ -205,9 +220,10 @@ def _pick_size(model, size, t0_values):
     return t0_values[len(t0_values) // 2] if t0_values else None
 
 
-def _variant(o):
+def _variant(o, optimizer_given):
     """Short name for what this run changes, e.g. "size64", "size64-nomask-pre" or "size64-sgd-lr0.1";
-    also used in file names."""
+    also used in file names. The optimiser and learning rate appear only when the run set them (S9, T0b);
+    the learning rate actually used is always in the lr column of results.csv."""
     parts = [f"size{o['size']}" if o["size"] is not None else "base"]
     if not o["mask"]:
         parts.append("nomask")
@@ -221,7 +237,7 @@ def _variant(o):
         parts.append(f"frac{o['fraction']:g}")
     if o["task"] == "2":
         parts.append("task2")
-    if o["optimizer"] != config.OPTIMIZER or o["lr"] != config.LEARNING_RATE:
+    if optimizer_given:
         parts.append(f"{o['optimizer']}-lr{o['lr']:g}")
     if o["dropout"] is not None:
         parts.append(f"do{o['dropout']:g}")
@@ -262,7 +278,7 @@ def main():
     parser = argparse.ArgumentParser(description="One training run (PLAN.md, section 7).")
     parser.add_argument("--model", required=True, choices=sorted(MODELS))
     parser.add_argument("--seed", type=int, default=1)
-    parser.add_argument("--study", default="dev", help="S9a, S9, T0, S1, ...; goes into results.csv and file names")
+    parser.add_argument("--study", default="dev", help="S9a, S9, T0a, T0b, S1, ...; goes into results.csv and file names")
     parser.add_argument("--size", type=int, help="tuned setting; default: config.MODEL_SIZES or the middle T0 value")
     parser.add_argument("--no-mask", action="store_true", help="Embedding without mask_zero (S2)")
     parser.add_argument("--padding", choices=["post", "pre"], help="zeros after or before the text (S2)")

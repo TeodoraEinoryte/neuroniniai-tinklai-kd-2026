@@ -35,7 +35,7 @@ Contents:
 A lab compares a few models on one task. The coursework is a **study** with four research questions:
 
 1. **Which architecture recognises emotions in short texts best, and at what cost?** 10 models from 4 families, 5 seeds each, statistical test, parameters and time.
-2. **Which text-specific training choices matter?** Padding/masking in recurrent networks, class weights for uneven classes, training-set size, 6 vs 2 classes.
+2. **Which text-specific training choices matter?** Optimiser and learning rate (8 optimisers), padding/masking in recurrent networks, class weights for uneven classes, training-set size, 6 vs 2 classes.
 3. **Do the models generalise?** Test on a different, human-labelled dataset (GoEmotions) and on Lithuanian sentences.
 4. **What do the models actually learn: keywords or context?** Keyword baseline, attention weights, negation, error analysis.
 
@@ -45,12 +45,12 @@ A lab compares a few models on one task. The coursework is a **study** with four
 |---|---|---|---|
 | Task | MNIST | MNIST + IMDB, 2 classes | 6 emotions, uneven classes (3.6 %–33.5 %) |
 | Architectures | Dense | 5 (Conv2D, Dense, Conv1D, LSTM, GRU) | 10 in 4 families. New vs lab 2: logistic regression, Transformer, SimpleRNN, BiLSTM, BiLSTM + attention |
-| Trained runs | ~30, 1 each | ~21–24, 1 each | ~340: tuning on validation, then 5 seeds → mean ± std, McNemar test |
+| Trained runs | ~30, 1 each | ~21–24, 1 each | ~480: tuning on validation, then 5 seeds → mean ± std, McNemar test |
 | Metrics | accuracy, loss | accuracy, loss, time | per-class precision/recall/F1, macro-F1, confusion matrix, parameters, train and inference time |
 | Context | – | – | baselines (majority 34.8 %, keyword rule 72.4 %) and competitor (fine-tuned DistilBERT) |
 | Data | ready | ready | own data-quality analysis (keyword labels, conflicts, leakage) |
 | Generalisation | – | – | GoEmotions (6,535 texts) and Lithuanian sentences |
-| Extra studies | hyperparameters | hyperparameters | masking, class weights, training-set size, binary vs 6 classes |
+| Extra studies | hyperparameters | hyperparameters | 8 optimisers × 4 learning rates on text models, masking, class weights, training-set size, binary vs 6 classes |
 | Interpretation | – | – | attention heatmaps, error examples, negation subset |
 | Product | – | – | `predict.py`: sentence in → emotion probabilities out |
 
@@ -88,7 +88,7 @@ Positive = joy, love, surprise; negative = sadness, anger, fear (45.2 % / 54.8 %
 | Sequence length | 50 tokens (98.7 % of train texts fit whole; `length_coverage.csv`) |
 | Embedding size | 64 |
 | Masking | `Embedding(mask_zero=True)` for sequence models (except where S2 changes it) |
-| Optimiser | Adam, learning rate 0.001 |
+| Optimiser | Adam, learning rate 0.001 (`config.OPTIMIZER`). One optimiser for every run; S9 checks this choice before T0 and may replace it (step 2.3) |
 | Loss | sparse categorical cross-entropy, softmax output |
 | Batch | 64 |
 | Epochs | up to 30, `EarlyStopping(val_loss, patience=3, restore_best_weights=True)` |
@@ -138,17 +138,26 @@ Not models we train, but points of comparison:
 
 | ID | What changes (everything else fixed) | Runs | Runs on | Owner | Report |
 |---|---|---|---|---|---|
+| S9a | Optimiser grid: 8 optimisers × learning rates 0.1 / 0.01 / 0.001 / 0.0001, for Conv1D and GRU, seed 1, pick each optimiser's best rate by validation macro-F1 | 8 × 4 × 2 = 64 | B's machine | B | 3.6 |
+| S9 | Optimisers: each at its best learning rate, Conv1D and GRU, 5 seeds | 8 × 2 × 5 = 80 | B's machine | B | 3.6 |
 | T0 | Tuning: one capacity setting × 3 values per model, seeds 1–2, pick by validation macro-F1 | 9 × 3 × 2 = 54 | B's machine | each picks for own models | 3.2 |
 | **S1** | **Main comparison:** 10 tuned models. Also saves predictions for test, GoEmotions and LT/EN sentences | 10 × 5 = 50 | B's machine | both | 3.3 |
 | S2 | Padding/masking: post-padding without mask / pre-padding without mask / with mask, for SimpleRNN, LSTM, GRU, BiLSTM | 4 × 3 × 5 = 60 | B | B | 3.4 |
 | S3 | Class weights: none vs inverse class frequency | 10 × 5 (+ S1) | B | B | 3.5 |
-| S4 | Training-set size: 1k, 2k, 4k, 8k, 16k (stratified) for logreg + best model of each family | 5 × 5 × 3 = 75 | A | A | 3.6 |
-| S5 | 2 classes vs 6 classes | 10 × 5 | A | A | 3.7 |
-| S6 | Generalisation: reads the S1 predictions for GoEmotions and LT/EN, no retraining | 0 | – | A | 3.8 |
-| S7 | Errors: confusion matrices, most-confused pairs, misclassified examples, negation subset, attention heatmaps, McNemar | 0 | – | B | 3.9 |
+| S4 | Training-set size: 1k, 2k, 4k, 8k, 16k (stratified) for logreg + best model of each family | 5 × 5 × 3 = 75 | A | A | 3.7 |
+| S5 | 2 classes vs 6 classes | 10 × 5 | A | A | 3.8 |
+| S6 | Generalisation: reads the S1 predictions for GoEmotions and LT/EN, no retraining | 0 | – | A | 3.9 |
+| S7 | Errors: confusion matrices, most-confused pairs, misclassified examples, negation subset, attention heatmaps, McNemar | 0 | – | B | 3.10 |
 | S8 | Cost: parameters, s/epoch, training time, inference time per 1,000 texts → quality vs cost chart | from S1 logs | – | B | 3.3 |
 
-About 340 training runs, roughly 2–4 hours of CPU time in total.
+About 480 training runs, roughly 3–6 hours of CPU time in total.
+
+**S9, optimisers (runs first, before T0):**
+- **Optimisers (8):** the six from lecture 5 (SGD, SGD + Momentum 0.9, Nesterov, RMSprop, Adam, Nadam), plus Adagrad (made for sparse features such as words) and AdamW (Adam with weight decay, standard for Transformers). Keras defaults otherwise.
+- **Why a learning-rate grid:** lab 1 (task 6.3) showed that SGD needs a much larger learning rate than Adam or RMSprop. Comparing all of them at 0.001 would be unfair to SGD, so each optimiser gets its own best rate (S9a) before the 5-seed comparison (S9).
+- **Why Conv1D and GRU:** the best non-recurrent and the best recurrent model of the pilot run. Recurrent networks are where plain SGD is expected to struggle (gradients pass through 50 time steps), so the two families may react differently.
+- **Sizes:** the middle T0 value (Conv1D 128 filters, GRU 64 units), because T0 runs after S9.
+- **Decision rule for the main protocol (👤 both):** the protocol keeps one optimiser for every model, so the main comparison changes only the architecture. After S9, take the optimiser with the highest mean validation macro-F1 over both models. If Adam (0.001) is within one standard deviation of it, keep Adam. Otherwise switch `config.OPTIMIZER` and `config.LEARNING_RATE` before T0, so T0 and all later studies use the new choice. The test set is not used for this decision.
 
 **McNemar test:** best model vs every other model, per seed. Report in how many of the 5 seeds the difference is significant (p < 0.05). Implemented ourselves in numpy: χ² = (|b − c| − 1)² / (b + c); p from the χ² distribution with 1 degree of freedom, using `math.erfc`.
 
@@ -162,7 +171,8 @@ About 340 training runs, roughly 2–4 hours of CPU time in total.
 ```
 neuroniniai-tinklai-kd-2026/
   README.md, PLAN.md, requirements.txt, .gitignore
-  config.py            shared settings (section 4), class names in English and Lithuanian
+  config.py            shared settings (section 4), class names in English and Lithuanian; sizes from T0 and
+                       learning rates from S9a are filled in here
   download_data.py     A: one-off script that created data/*.csv from Hugging Face
   data.py              A: loading, vectorising, pre/post padding, binary version, subsets, GoEmotions, LT
   data_analysis.py     A: data analysis figures + quality checks + baselines (report 3.1)
@@ -204,14 +214,14 @@ mcnemar(y, p1, p2) -> (chi2, p_value)
 
 ```bash
 python train.py --model lstm --seed 1 --study S1 [--size 64] [--no-mask] [--padding pre]
-                [--class-weight] [--fraction 0.25] [--task 2] [--dev]
-python run_study.py S2           # all runs of one study
+                [--class-weight] [--fraction 0.25] [--task 2] [--optimizer sgd --lr 0.1] [--dev]
+python run_study.py S2           # all runs of one study (S9a, S9, T0, S1–S5)
 python compare.py                # tables and figures for the report
 python predict.py "i feel so alone tonight"
 ```
 
 **`results.csv`, one row per run:**
-- run info: `date`, `study`, `model`, `family`, `variant`, `seed`, `machine`
+- run info: `date`, `study`, `model`, `family`, `variant`, `seed`, `machine`, `optimizer`, `lr`
 - model and training: `params`, `epochs`, `train_time_s`, `predict_ms_1000`
 - validation: `val_acc`, `val_loss`, `val_macro_f1`
 - test: `test_acc`, `test_loss`, `test_macro_f1`, `f1_sadness` … `f1_surprise`
@@ -224,7 +234,7 @@ Predictions for every text are saved per run in `predictions/` (test, plus GoEmo
 |---|---|---|
 | Models (5 each) | logreg, MLP, Embedding, Conv1D, Transformer | SimpleRNN, LSTM, GRU, BiLSTM, BiLSTM + attention |
 | Shared code | `data.py`, `data_analysis.py`, `generalization.py`, `predict.py` | `evaluation.py`, `train.py`, `run_study.py`, most of `compare.py` |
-| Studies | data analysis, S4, S5, S6, demo | running T0 and S1, S2, S3, S7, S8 |
+| Studies | data analysis, S4, S5, S6, demo | S9 optimisers, running T0 and S1, S2, S3, S7, S8 |
 | Report text | ~22,700 characters (section 10) | ~21,700 characters + drafts of 3.2, 3.3, 2.4.10, conclusions (section 10) |
 | Talk | ~half of the slides | ~half of the slides |
 | Also | repo setup, Google Doc owner: outline, styles, final formatting | number check, character/page count |
@@ -246,7 +256,7 @@ Phases overlap. Writing that needs no results (literature, model theory) starts 
 |---|---|---|---|---|---|
 | 1.1 | `data.py`: `load_emotion`, `vectorize` (post/pre padding, multi-hot), binary, stratified subsets, GoEmotions, LT | A | 0.2 | functions match section 7 | ✅ |
 | 1.2 | `evaluation.py`: metrics in numpy, confusion matrix, McNemar, plots in Lithuanian; checked on a small hand-computed example | B | – | example matches hand calculation | ✅ `python evaluation.py` checks a 10-text example against the hand calculation and Keras `F1Score` |
-| 1.3 | `train.py` + `run_study.py` | B | 1.1, 1.2 | `python train.py --model logreg --seed 1 --dev` writes a row, curve and matrix |  |
+| 1.3 | `train.py` + `run_study.py` | B | 1.1, 1.2 | `python train.py --model logreg --seed 1 --dev` writes a row, curve and matrix | ✅ also tested: S1 extras (GoEmotions, LT/EN, saved model), no mask, pre padding, class weights, binary task, `run_study.py` skips finished runs. `models_a.py` starts with logreg; model keys in `train.FAMILIES` |
 | 1.4 | `data_analysis.py`: class and length plots, quality checks, majority and keyword baselines | A | 1.1 | figures and numbers for 3.1 | 🟡 tables done (classes, vocabulary, length, dataset overview, GoEmotions filter); plots, quality checks (feel-words, conflicts, leakage) and baselines still to do |
 | 1.5 | LT sentences: 30 each (5 per emotion) + English translations → `lt_sentences.csv` | both | – | 60 rows | 🟡 file format set, 2 example rows of 60 |
 
@@ -255,14 +265,15 @@ Phases overlap. Writing that needs no results (literature, model theory) starts 
 |---|---|---|---|---|---|
 | 2.1 | `models_a.py`: 5 models | A | 1.3 | each trains via `train.py --dev` |  |
 | 2.2 | `models_b.py`: 5 models; the attention model can output word weights | B | 1.3 | each trains via `train.py --dev` |  |
-| 2.3 | T0 tuning: B runs it for all models; each owner picks own sizes → `config.py` | run B, pick each | 2.1, 2.2 | T0 rows in CSV, sizes in `config.py` |  |
+| 2.3 | S9a + S9 optimisers on Conv1D and GRU; best rates → `config.S9_LEARNING_RATES`; main optimiser by the rule in section 6 (👤 both) | B | Conv1D from 2.1, GRU from 2.2 | 144 S9a/S9 rows, `config.OPTIMIZER` confirmed or changed |  |
+| 2.4 | T0 tuning: B runs it for all models; each owner picks own sizes → `config.py` | run B, pick each | 2.1, 2.2, 2.3 | T0 rows in CSV, sizes in `config.py` |  |
 
 ### Phase 3 — Experiments
 | # | Step | Owner | Needs | Done when | Status |
 |---|---|---|---|---|---|
-| 3.1 | S1 main comparison (saves predictions + best model) | B | 2.3, 1.5 | 50 S1 rows, predictions committed |  |
+| 3.1 | S1 main comparison (saves predictions + best model) | B | 2.4, 1.5 | 50 S1 rows, predictions committed |  |
 | 3.2 | S2 masking, S3 class weights | B | 3.1 | rows in CSV |  |
-| 3.3 | S4 training-set size, S5 binary | A | 2.3 | rows in CSV |  |
+| 3.3 | S4 training-set size, S5 binary | A | 2.4 | rows in CSV |  |
 
 ### Phase 4 — Analysis outputs
 | # | Step | Owner | Needs | Done when | Status |
@@ -277,7 +288,7 @@ Phases overlap. Writing that needs no results (literature, model theory) starts 
 |---|---|---|---|---|
 | 5.1 | Literature review sections | each own | sources (start now) |  |
 | 5.2 | Model theory sections | each own | – (start now) |  |
-| 5.3 | Methodology: data, protocol, metrics, training | each own | 2.3 (final architectures) |  |
+| 5.3 | Methodology: data, protocol, metrics, training | each own | 2.4 (final architectures) |  |
 | 5.4 | Results sections | each own | phase 4 |  |
 | 5.5 | Shared sections: main comparison, summaries | drafter, then the other adds | 4.1 |  |
 | 5.6 | Intro and conclusions (written last) | A drafts intro, B drafts conclusions, both edit | 5.1–5.5 |  |
@@ -327,24 +338,25 @@ Character counts are targets with spaces. "Drafter" writes the first version; th
 | 2.4.5–2.4.9 B's models | B | 5 × 900 | SimpleRNN, LSTM, GRU, BiLSTM, BiLSTM + attention |
 | 2.4.10 Modelių suvestinė | drafter B | 400 + table | pros and cons, parameters |
 | 2.5 Bazinis lygis ir konkurentai | A | 900 | majority, keyword rule, DistilBERT/BERT |
-| 2.6 Mokymo parametrai ir hiperparametrų parinkimas | B | 900 | optimiser, loss, early stopping, T0 procedure |
+| 2.6 Mokymo parametrai ir hiperparametrų parinkimas | B | 900 | optimiser (8 compared in S9, how the main one is chosen), loss, early stopping, T0 procedure |
 | 2.7 Vertinimo kriterijai ir statistinis palyginimas | B | 1,500 | accuracy, precision, recall, F-measure, macro-F1, McNemar, all with formulas |
 | 2.8 Naudotos priemonės | A | 400 | Python, TensorFlow/Keras, git, hardware |
-| **3. PRAKTINĖ DALIS** | | **12,700** + figures | |
+| **3. PRAKTINĖ DALIS** | | **13,900** + figures | |
 | 3.1 Duomenų analizė | A | 1,500 | class and length plots, keyword finding, baselines |
 | 3.2 Hiperparametrų parinkimas | drafter B | 800 + table | T0 results, chosen sizes |
 | 3.3 Modelių palyginimas | drafter B, A adds | 2,200 | main table (mean ± std), bar chart, McNemar, quality vs cost |
 | 3.4 Užpildymo ir kaukės įtaka | B | 1,300 | S2 table, explanation via hidden state |
 | 3.5 Klasių disbalanso įtaka | B | 1,300 | S3 per-class F1 before/after |
-| 3.6 Mokymo imties dydžio įtaka | A | 1,100 | S4 learning curve: "is the data enough" |
-| 3.7 Binarinė ir daugiaklasė klasifikacija | A | 900 | S5 table |
-| 3.8 Apibendrinimas kitiems duomenims | A | 1,500 | GoEmotions drop, LT vs EN |
-| 3.9 Klaidų analizė ir dėmesio vizualizacija | B | 1,500 | confusion matrices, examples, negation, heatmaps |
-| 3.10 Emocijų atpažinimo įrankis | A | 600 | demo, screenshot |
+| 3.6 Optimizatoriaus ir mokymosi greičio įtaka | B | 1,200 | S9a heatmap (optimiser × learning rate), S9 table (mean ± std, Conv1D vs GRU), which optimiser the protocol keeps |
+| 3.7 Mokymo imties dydžio įtaka | A | 1,100 | S4 learning curve: "is the data enough" |
+| 3.8 Binarinė ir daugiaklasė klasifikacija | A | 900 | S5 table |
+| 3.9 Apibendrinimas kitiems duomenims | A | 1,500 | GoEmotions drop, LT vs EN |
+| 3.10 Klaidų analizė ir dėmesio vizualizacija | B | 1,500 | confusion matrices, examples, negation, heatmaps |
+| 3.11 Emocijų atpažinimo įrankis | A | 600 | demo, screenshot |
 | **IŠVADOS** | drafter B, both | 2,500 | one numbered conclusion per task, each with a number |
 | LITERATŪROS SĄRAŠAS | A formats | – | ~25–30 sources |
 | PRIEDAI | both | – | extra tables, link to the repo |
-| **Total** | | **~44,400 (≈ 24.7 pages)** | A ≈ 22,700, B ≈ 21,700 (shared sections counted half each; B drafts more of the shared ones) |
+| **Total** | | **~45,600 (≈ 25.3 pages)** | A ≈ 22,700, B ≈ 22,900 (shared sections counted half each; B drafts more of the shared ones) |
 
 ### Draft aim, tasks and contributions (Lithuanian, final wording at step 5.6)
 
@@ -355,12 +367,12 @@ Character counts are targets with spaces. "Drafter" writes the first version; th
 2. Ištirti duomenų rinkinį ir jo kokybę, nustatyti bazinį tikslumo lygį. → 2.2, 3.1
 3. Sukurti ir vienodomis sąlygomis apmokyti dešimt skirtingų architektūrų modelių. → 2.4, 3.2
 4. Palyginti modelius pagal kokybės kriterijus, sąnaudas ir statistinį reikšmingumą. → 3.3
-5. Ištirti užpildymo kaukės, klasių disbalanso, mokymo imties dydžio ir klasių skaičiaus įtaką rezultatams. → 3.4–3.7
-6. Įvertinti modelių gebėjimą apibendrinti kitame duomenų rinkinyje ir lietuviškiems sakiniams, išanalizuoti klaidas. → 3.8–3.10
+5. Ištirti užpildymo kaukės, klasių disbalanso, optimizatoriaus ir mokymosi greičio, mokymo imties dydžio ir klasių skaičiaus įtaką rezultatams. → 3.4–3.8
+6. Įvertinti modelių gebėjimą apibendrinti kitame duomenų rinkinyje ir lietuviškiems sakiniams, išanalizuoti klaidas. → 3.9–3.11
 
 **Darbų pasiskirstymas:** Kursinį darbą atliko du studentai. Darbas pasidalintas pagal lyginamų modelių šeimas.
 - Teodora Einorytė tyrė nerekurentinius modelius: logistinę regresiją, daugiasluoksnį perceptroną, vektorinio žodžių atvaizdavimo, konvoliucinį (Conv1D) ir Transformer tinklus. Ji parengė duomenų įkėlimo ir paruošimo modulį, atliko duomenų analizę ir mokymo imties dydžio, binarinės klasifikacijos bei apibendrinimo kitiems duomenims tyrimus, sukūrė emocijų atpažinimo įrankį.
-- Edgaras Legus tyrė rekurentinius modelius: SimpleRNN, LSTM, GRU, BiLSTM ir BiLSTM su dėmesio mechanizmu. Jis parengė vertinimo, mokymo ir rezultatų palyginimo modulius, atliko užpildymo kaukės ir klasių disbalanso tyrimus bei klaidų analizę.
+- Edgaras Legus tyrė rekurentinius modelius: SimpleRNN, LSTM, GRU, BiLSTM ir BiLSTM su dėmesio mechanizmu. Jis parengė vertinimo, mokymo ir rezultatų palyginimo modulius, atliko optimizatorių, užpildymo kaukės ir klasių disbalanso tyrimus bei klaidų analizę.
 
 Kiekvienas narys aprašė savo modelius teorinėje ir metodinėje dalyse. Įvadą, modelių palyginimą ir išvadas abu nariai parengė kartu. Išsamus pasiskirstymas pateiktas 1 lentelėje.
 
@@ -411,7 +423,7 @@ Kiekvienas narys aprašė savo modelius teorinėje ir metodinėje dalyse. Įvad�
 | 6 | Protocol: fair comparison, 5 seeds, McNemar | B |
 | 7 | Main comparison table / chart | B |
 | 8 | Quality vs cost | B |
-| 9 | Masking finding, class weights | B |
+| 9 | Optimisers, masking finding, class weights | B |
 | 10 | Training-set size, binary vs 6 classes | A |
 | 11 | Generalisation: GoEmotions, Lithuanian sentences | A |
 | 12 | Demo (live or screenshot) | A |
@@ -450,6 +462,11 @@ Each person must also be able to answer questions about the other's part at a ba
 **Training and evaluation**
 - Srivastava, N. et al. (2014). Dropout. *JMLR*, 15.
 - Kingma, D., Ba, J. (2015). Adam: A method for stochastic optimization. *ICLR 2015*.
+- Sutskever, I., Martens, J., Dahl, G., Hinton, G. (2013). On the importance of initialization and momentum in deep learning. *ICML 2013*. (Momentum, Nesterov; S9)
+- Duchi, J., Hazan, E., Singer, Y. (2011). Adaptive subgradient methods for online learning and stochastic optimization. *JMLR*, 12. (Adagrad; S9)
+- Tieleman, T., Hinton, G. (2012). Lecture 6.5 – RMSprop. *COURSERA: Neural Networks for Machine Learning*. (RMSprop; S9)
+- Dozat, T. (2016). Incorporating Nesterov momentum into Adam. *ICLR 2016 Workshop*. (Nadam; S9)
+- Loshchilov, I., Hutter, F. (2019). Decoupled weight decay regularization. *ICLR 2019*. (AdamW; S9)
 - McNemar, Q. (1947). Note on the sampling error of the difference between correlated proportions or percentages. *Psychometrika*, 12(2).
 - Dietterich, T. (1998). Approximate statistical tests for comparing supervised classification learning algorithms. *Neural Computation*, 10(7).
 

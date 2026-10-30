@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 import config
-from data import goemotions_keep, load_emotion, load_goemotions, load_goemotions_raw, load_lt, vectorize
+from data import goemotions_keep, load_emotion, load_goemotions, load_goemotions_raw, load_lt_test, vectorize
 
 TABLES_DIR = os.path.join(config.RESULTS_DIR, "tables")
 
@@ -108,16 +108,15 @@ if __name__ == "__main__":
     print(lengths)
     save(lengths, "length_coverage.csv", index=False)
 
-    # All three datasets side by side (LT sentences: fill in data/lt_sentences.csv and rerun)
+    # All three datasets side by side; the LT test set is the dair-ai test set machine-translated into Lithuanian
     x_go, y_go = load_goemotions()
-    x_lt, x_en, y_lt = load_lt()
+    x_lt, _, y_lt, _ = load_lt_test()
     overview = dataset_overview(d, {
         "dair-ai train": (d["x_train"], d["y_train"]),
         "dair-ai validation": (d["x_val"], d["y_val"]),
         "dair-ai test": (d["x_test"], d["y_test"]),
         "GoEmotions": (x_go, y_go),
-        "LT sakiniai": (x_lt, y_lt),
-        "LT vertimai (EN)": (x_en, y_lt),
+        "LT testas (vertimas)": (x_lt, y_lt),
     })
     print(overview.to_string())
     save(overview, "dataset_overview.csv", index_label="rodiklis")

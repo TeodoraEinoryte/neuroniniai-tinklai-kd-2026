@@ -70,19 +70,6 @@ def load_goemotions(task="6"):
     return x, _labels(y, task)
 
 
-def load_lt(task="6"):
-    """Our own Lithuanian sentences and their English translations (generalisation test only).
-
-    lt_sentences.csv columns: text_lt, text_en, label (emotion name in English, e.g. "joy").
-    Returns (x_lt, x_en, y); both texts are cleaned the same way as the training data.
-    """
-    df = pd.read_csv(_path("lt_sentences.csv"))
-    y = df["label"].map(config.CLASSES_EN.index).to_numpy()   # "joy" -> 1
-    x_lt = df["text_lt"].map(clean_text).to_numpy()
-    x_en = df["text_en"].map(clean_text).to_numpy()
-    return x_lt, x_en, _labels(y, task)
-
-
 def load_lt_test(task="6"):
     """Our 2,000 test texts machine-translated into Lithuanian (download_lt_test.py); for testing only.
 

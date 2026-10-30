@@ -1,13 +1,19 @@
 import os
-from collections import Counter
+import re
+from collections import Counter, defaultdict
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 import config
-from data import goemotions_keep, load_emotion, load_goemotions, load_goemotions_raw, load_lt_test, vectorize
+import evaluation
+from data import (FEEL_WORDS, emotion_word, goemotions_keep, load_emotion, load_goemotions, load_goemotions_raw,
+                  load_lt_test, vectorize)
 
 TABLES_DIR = os.path.join(config.RESULTS_DIR, "tables")
+FIGURES_DIR = os.path.join(config.RESULTS_DIR, "figures")
+NEGATION = re.compile(r"\b(?:not|dont|didnt|never|cant|wont|isnt|wasnt)\b")
 
 
 def class_distribution(d):
@@ -85,6 +91,126 @@ def goemotions_filter():
     return steps, per_class
 
 
+def keyword(text):
+    """The emotion word of a text (data.emotion_word), or None."""
+    i = emotion_word(text)
+    return text.split()[i] if i is not None else None
+
+
+def keyword_rule(x_train, y_train):
+    """Keyword rule: each emotion word -> its most common label in train.
+    Returns predict(texts); texts without a known emotion word get the majority class."""
+    counts = defaultdict(Counter)
+    for text, y in zip(x_train, y_train):
+        k = keyword(text)
+        if k:
+            counts[k][y] += 1
+    rule = {k: c.most_common(1)[0][0] for k, c in counts.items()}
+    majority = Counter(y_train).most_common(1)[0][0]
+    return lambda texts: np.array([rule.get(keyword(t), majority) for t in texts])
+
+
+def baselines(d):
+    """Two baselines every model must beat: always the majority class, and the keyword rule."""
+    majority = Counter(d["y_train"]).most_common(1)[0][0]
+    rule = keyword_rule(d["x_train"], d["y_train"])
+    rows = {}
+    for name, predict in [(f"dauguma (visada „{config.CLASSES_LT[majority]}“)", lambda x: np.full(len(x), majority)),
+                          ("raktinio žodžio taisyklė", rule)]:
+        row = {}
+        for split, label in [("val", "validavimo"), ("test", "testavimo")]:
+            m = evaluation.metrics(d[f"y_{split}"], predict(d[f"x_{split}"]), len(config.CLASSES_EN))
+            row[f"{label} bendras tikslumas, %"] = round(m["accuracy"] * 100, 1)
+            row[f"{label} makro F-matas"] = round(m["macro_f1"], 3)
+        rows[name] = row
+    return pd.DataFrame(rows).T
+
+
+def quality_checks(d):
+    """Problems of the dataset that go into the report: keyword labels, conflicting labels, overlap of the splits."""
+    x_train = pd.Series(d["x_train"])
+    everything = pd.DataFrame({"text": np.concatenate([d["x_train"], d["x_val"], d["x_test"]]),
+                               "label": np.concatenate([d["y_train"], d["y_val"], d["y_test"]])})
+    train_texts = set(d["x_train"])
+
+    # words seen in >= 3 train texts that always come with the same label (pure keyword signal)
+    word_labels = defaultdict(Counter)
+    for text, y in zip(d["x_train"], d["y_train"]):
+        for word in set(text.split()):
+            word_labels[word][y] += 1
+    pure = [w for w, c in word_labels.items() if sum(c.values()) >= 3 and len(c) == 1]
+
+    checks = {
+        "mokymo tekstų su feel / feels / feeling / felt, %": x_train.str.split().map(lambda w: bool(FEEL_WORDS & set(w))).mean() * 100,
+        "mokymo tekstų, kuriuose rastas emocijos žodis, %": x_train.map(lambda t: emotion_word(t) is not None).mean() * 100,
+        "mokymo tekstų su neiginiu (not, dont, never ...), %": x_train.str.contains(NEGATION).mean() * 100,
+        "tekstų, kurie kartojasi su skirtingomis žymomis (visi 20 000)": (everything.groupby("text")["label"].nunique() > 1).sum(),
+        "testavimo tekstų, kurie yra ir mokymo imtyje": sum(t in train_texts for t in d["x_test"]),
+        "validavimo tekstų, kurie yra ir mokymo imtyje": sum(t in train_texts for t in d["x_val"]),
+        "žodžių (≥ 3 mokymo tekstuose), kurie visada su ta pačia emocija": len(pure),
+    }
+    return pd.DataFrame({"reikšmė": {k: round(float(v), 1) for k, v in checks.items()}})
+
+
+def emotion_words(d, n=5):
+    """The n most frequent emotion words of each class in train, and how often each comes with that class.
+
+    Only words that come with the class in more than half of their texts, so words like "i" in
+    "i feel like i ..." (no emotion word after feel) do not fill the table.
+    """
+    counts = defaultdict(Counter)
+    for text, y in zip(d["x_train"], d["y_train"]):
+        k = keyword(text)
+        if k:
+            counts[k][y] += 1
+    rows = []
+    for label, emotion in enumerate(config.CLASSES_LT):
+        own = [w for w in counts if counts[w][label] > sum(counts[w].values()) / 2]
+        words = sorted(own, key=lambda w: counts[w][label], reverse=True)[:n]
+        for w in words:
+            total = sum(counts[w].values())
+            rows.append({"emocija": emotion, "žodis": w, "tekstų su šia emocija": counts[w][label],
+                         "visada su šia emocija, %": round(counts[w][label] / total * 100, 1)})
+    return pd.DataFrame(rows)
+
+
+def plot_class_distribution(d, path):
+    """Share of each emotion in train, validation and test (bars side by side)."""
+    splits = [("mokymo", d["y_train"]), ("validavimo", d["y_val"]), ("testavimo", d["y_test"])]
+    x = np.arange(len(config.CLASSES_LT))
+    fig, ax = plt.subplots(figsize=(8, 4))
+    for i, (name, y) in enumerate(splits):
+        shares = np.bincount(y, minlength=len(x)) / len(y) * 100
+        ax.bar(x + (i - 1) * 0.27, shares, width=0.27, label=f"{name} imtis")
+    ax.set_xticks(x, config.CLASSES_LT)
+    ax.set_ylabel("Dalis, %")
+    ax.set_title("Emocijų pasiskirstymas imtyse")
+    ax.grid(axis="y", alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+
+
+def plot_lengths(texts, path):
+    """Histogram of words per train text, with the sequence length and the IQR outlier bound (lecture 1)."""
+    n_words = pd.Series(texts).str.split().str.len()
+    q1, q3 = n_words.quantile(0.25), n_words.quantile(0.75)
+    bound = q3 + 1.5 * (q3 - q1)                  # longer texts are outliers by the quartile rule
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.hist(n_words, bins=range(1, n_words.max() + 2), color="tab:blue", alpha=0.8)
+    ax.axvline(bound, color="tab:orange", linestyle="--", label=f"Q3 + 1,5·IQR = {bound:g}")
+    ax.axvline(config.SEQUENCE_LENGTH, color="tab:red", label=f"sekos ilgis = {config.SEQUENCE_LENGTH}")
+    ax.set_xlabel("Žodžių tekste")
+    ax.set_ylabel("Tekstų skaičius")
+    ax.set_title("Tekstų ilgis mokymo imtyje")
+    ax.grid(axis="y", alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+
+
 def save(table, filename, **kwargs):
     table.to_csv(os.path.join(TABLES_DIR, filename), **kwargs)
     print("Išsaugota:", os.path.join(TABLES_DIR, filename))
@@ -92,6 +218,7 @@ def save(table, filename, **kwargs):
 
 if __name__ == "__main__":
     os.makedirs(TABLES_DIR, exist_ok=True)
+    os.makedirs(FIGURES_DIR, exist_ok=True)
     d = load_emotion()
     print("Imčių dydžiai:", len(d["y_train"]), len(d["y_val"]), len(d["y_test"]))
 
@@ -126,3 +253,20 @@ if __name__ == "__main__":
     print(per_class.to_string())
     save(steps, "goemotions_filter.csv", index_label="žingsnis")
     save(per_class, "goemotions_filter_per_class.csv", index_label="emocija")
+
+    # Data quality and baselines (report 4.1)
+    checks = quality_checks(d)
+    print(checks.to_string())
+    save(checks, "quality_checks.csv", index_label="rodiklis")
+
+    base = baselines(d)
+    print(base.to_string())
+    save(base, "baselines.csv", index_label="bazinis lygis")
+
+    words = emotion_words(d)
+    print(words.to_string(index=False))
+    save(words, "emotion_words.csv", index=False)
+
+    plot_class_distribution(d, os.path.join(FIGURES_DIR, "class_distribution.png"))
+    plot_lengths(d["x_train"], os.path.join(FIGURES_DIR, "length_distribution.png"))
+    print("Išsaugoti grafikai:", FIGURES_DIR)

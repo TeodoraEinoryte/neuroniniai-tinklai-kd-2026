@@ -85,7 +85,7 @@ Positive = joy, love, surprise; negative = sadness, anger, fear (45.2 % / 54.8 %
 | Setting | Value |
 |---|---|
 | Tokenisation | `TextVectorization`, vocabulary 10,000, adapted on **train only** |
-| Sequence length | 50 tokens (covers > 99 % of texts) |
+| Sequence length | 50 tokens (98.7 % of train texts fit whole; `length_coverage.csv`) |
 | Embedding size | 64 |
 | Masking | `Embedding(mask_zero=True)` for sequence models (except where S2 changes it) |
 | Optimiser | Adam, learning rate 0.001 |
@@ -238,17 +238,17 @@ Phases overlap. Writing that needs no results (literature, model theory) starts 
 |---|---|---|---|---|---|
 | 0.1 | Read this plan, settle the open decisions (section 13) | both | – | plan merged in `main` | ✅ |
 | 0.2 | Repo setup: `requirements.txt`, `.gitignore`, `config.py`, data CSVs (emotion, GoEmotions) | A | 0.1 | `data/` in repo | ✅ |
-| 0.3 | Google Doc: outline from section 10, styles (TNR 12, single spacing, Heading 1–3, captions), character budget per section as a comment, working list of sources | A | 0.1 | doc matches section 10 |  |
+| 0.3 | Google Doc: outline from section 10, styles (TNR 12, single spacing, Heading 1–3, captions), character budget per section as a comment, working list of sources | A | 0.1 | doc matches section 10 | ✅ budgets as "[owner · ~N ženklų]" before each section note (not comments); 26 starter sources in LITERATŪROS SĄRAŠAS |
 | 0.4 | Register the talk date | both | – | date booked |  |
 
 ### Phase 1 — Shared code
 | # | Step | Owner | Needs | Done when | Status |
 |---|---|---|---|---|---|
 | 1.1 | `data.py`: `load_emotion`, `vectorize` (post/pre padding, multi-hot), binary, stratified subsets, GoEmotions, LT | A | 0.2 | functions match section 7 | ✅ |
-| 1.2 | `evaluation.py`: metrics in numpy, confusion matrix, McNemar, plots in Lithuanian; checked on a small hand-computed example | B | – | example matches hand calculation |  |
+| 1.2 | `evaluation.py`: metrics in numpy, confusion matrix, McNemar, plots in Lithuanian; checked on a small hand-computed example | B | – | example matches hand calculation | ✅ `python evaluation.py` checks a 10-text example against the hand calculation and Keras `F1Score` |
 | 1.3 | `train.py` + `run_study.py` | B | 1.1, 1.2 | `python train.py --model logreg --seed 1 --dev` writes a row, curve and matrix |  |
-| 1.4 | `data_analysis.py`: class and length plots, quality checks, majority and keyword baselines | A | 1.1 | figures and numbers for 3.1 |  |
-| 1.5 | LT sentences: 30 each (5 per emotion) + English translations → `lt_sentences.csv` | both | – | 60 rows |  |
+| 1.4 | `data_analysis.py`: class and length plots, quality checks, majority and keyword baselines | A | 1.1 | figures and numbers for 3.1 | 🟡 tables done (classes, vocabulary, length, dataset overview, GoEmotions filter); plots, quality checks (feel-words, conflicts, leakage) and baselines still to do |
+| 1.5 | LT sentences: 30 each (5 per emotion) + English translations → `lt_sentences.csv` | both | – | 60 rows | 🟡 file format set, 2 example rows of 60 |
 
 ### Phase 2 — Models
 | # | Step | Owner | Needs | Done when | Status |

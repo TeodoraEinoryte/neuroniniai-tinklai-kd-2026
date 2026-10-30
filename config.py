@@ -39,8 +39,10 @@ MODEL_SIZES = {}
 MODEL_LEARNING_RATES = {}
 T0B_FACTORS = [0.3, 3]    # x 1 is the T0a run itself
 
-# S9: best learning rate of each optimiser from the S9a grid, e.g. {"sgd": 0.1}; filled at step 2.3
-S9_LEARNING_RATES = {}
+# S9: best learning rate of each optimiser from the S9a grid (highest mean validation macro-F1 of Conv1D and GRU,
+# seed 1; step 2.3)
+S9_LEARNING_RATES = {"sgd": 1.0, "momentum": 0.1, "nesterov": 0.1, "adagrad": 0.1, "adadelta": 1.0,
+                     "rmsprop": 0.01, "adam": 0.001, "nadam": 0.01, "adamw": 0.001}
 
 DATA_DIR = "data"
 RESULTS_DIR = "results"

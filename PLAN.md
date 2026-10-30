@@ -267,7 +267,8 @@ vectorize(d, mode="sequence", padding="post") -> dict
     # also returns the fitted "vectorizer"; encode(vectorizer, texts, mode, padding) encodes any other texts
 load_goemotions(task="6") -> (x, y)
 load_lt() -> (x_lt, x_en, y)                    # our own 60 sentences
-load_lt_test(task="6") -> (x_lt, x_en, y)       # the 2,000 test texts translated (data/lt_test.csv); cleaned like the rest
+load_lt_test(task="6") -> (x_lt, x_en, y, test_index)   # the 2,000 test texts translated (data/lt_test.csv), cleaned
+                                                #   like the rest; test_index = row in emotion_test.csv, to pair LT and EN
 glove_matrix(vectorizer, dim=100) -> np.array   # (VOCAB_SIZE, 100); row i = GloVe vector of word i, zeros if missing (S12)
 keyword_variants(texts) -> dict                 # S13: "without" (keyword → out-of-vocabulary word), "only" (keyword alone),
                                                 #      "keyword" (the word or ""), "has_keyword" (bool per text)
@@ -342,7 +343,7 @@ Phases overlap. Writing that needs no results (literature, model theory) starts 
 | 1.5 | LT sentences: 30 each (5 per emotion) + English translations → `lt_sentences.csv` | both | – | 60 rows | 🟡 file format set, 2 example rows of 60 |
 | 1.6 | `data.py`: `keyword_variants` (S13) and `test_in_train` (duplicates check), each checked on a few hand-made examples | A | 1.1 | functions match section 7 |  |
 | 1.7 | Code for the review additions: `evaluation.holm` (checked on a hand example), per-model learning rate in `train.py` (`config.MODEL_LEARNING_RATES`), T0a/T0b in `run_study.py`, keyword-test predictions in S1/S12 | B | 1.6 for the keyword predictions | tested in `--dev` | ✅ Holm checked by hand in `python evaluation.py`; S1 variant names stay the same when the T0b rate is used (the rate is in the `lr` column); T0b refuses to start before `MODEL_SIZES` is filled; S1/S12 save `p_kw_without`, `p_kw_only`, `kw_has` and refuse to start until `data.keyword_variants` (1.6) exists. Tested with a stand-in for 1.6 |
-| 1.8 | LT test set: `download_lt_test.py` → `data/lt_test.csv` (our test texts matched by English text and label, unmatched ones counted), `data.load_lt_test`, and S1/S12 save its predictions | B (small `data.py` function agreed with A) | 1.1 | ~2,000 rows, a few rows checked by eye; `--dev` S1 run saves `p_lt_test` |  |
+| 1.8 | LT test set: `download_lt_test.py` → `data/lt_test.csv` (our test texts matched by English text and label, unmatched ones counted), `data.load_lt_test`, and S1/S12 save its predictions | B (small `data.py` function agreed with A) | 1.1 | ~2,000 rows, a few rows checked by eye; `--dev` S1 run saves `p_lt_test` | ✅ all 2,000 test texts found with the same label (235 appear twice in the corpus, one kept); one example per emotion checked by eye, no empty or untranslated rows; 92.1 % of the Lithuanian words are unknown to our English vocabulary (English test: 3.6 %); S1/S12 save `p_lt_test`, `prob_lt_test`, `y_lt_test`, `lt_test_index` |
 
 ### Phase 2 — Models
 | # | Step | Owner | Needs | Done when | Status |

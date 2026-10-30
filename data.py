@@ -83,6 +83,19 @@ def load_lt(task="6"):
     return x_lt, x_en, _labels(y, task)
 
 
+def load_lt_test(task="6"):
+    """Our 2,000 test texts machine-translated into Lithuanian (download_lt_test.py); for testing only.
+
+    lt_test.csv columns: test_index, text_lt, text_en, label (0-5, as in emotion_test.csv).
+    Returns (x_lt, x_en, y, test_index); test_index is the row of the same text in emotion_test.csv,
+    so Lithuanian and English predictions can be compared text by text.
+    """
+    df = pd.read_csv(_path("lt_test.csv"))
+    x_lt = df["text_lt"].map(clean_text).to_numpy()      # "Aš jaučiuosi pasipiktinęs!" -> "aš jaučiuosi pasipiktinęs"
+    x_en = df["text_en"].map(clean_text).to_numpy()
+    return x_lt, x_en, _labels(df["label"].to_numpy(), task), df["test_index"].to_numpy()
+
+
 def vectorize(d, mode="sequence", padding="post"):
     """Turn the texts in d into model input. The vocabulary is built from train only.
 

@@ -294,7 +294,7 @@ Phases overlap. Writing that needs no results (literature, model theory) starts 
 | # | Step | Owner | Needs | Done when | Status |
 |---|---|---|---|---|---|
 | 2.1 | `models_a.py`: 5 models; Conv1D also takes the side-study arguments (section 7) | A | 1.3 | each trains via `train.py --dev`, Conv1D also with `--dropout`, `--l2`, `--layers 2`, `--embedding learned100` |  |
-| 2.2 | `models_b.py`: 5 models; the attention model can output word weights; GRU takes the side-study arguments, LSTM takes `layers` | B | 1.3 | each trains via `train.py --dev`, GRU also with the side-study options |  |
+| 2.2 | `models_b.py`: 5 models; the attention model can output word weights; GRU takes the side-study arguments, LSTM takes `layers` | B | 1.3 | each trains via `train.py --dev`, GRU also with the side-study options | ✅ all 5 take every side-study argument; `python models_b.py` checks parameter counts against the lecture 8 formulas; full-data check (seed 1): GRU 92.4 % / 0.881, BiLSTM + attention 92.2 % / 0.874; `attention_weights()` works on the saved model (padding gets weight 0) |
 | 2.3 | S9a + S9 optimisers on Conv1D and GRU; best rates → `config.S9_LEARNING_RATES`; main optimiser by the rule in section 6 (👤 both) | B | Conv1D from 2.1, GRU from 2.2 | 180 S9a/S9 rows, `config.OPTIMIZER` and `LEARNING_RATE` confirmed or changed |  |
 | 2.4 | T0 tuning: B runs it for all models; each owner picks own sizes → `config.py` | run B, pick each | 2.1, 2.2, 2.3 | T0 rows in CSV, sizes in `config.py` |  |
 

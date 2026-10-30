@@ -17,7 +17,7 @@ import numpy as np
 
 import config
 import evaluation
-from data import encode, load_emotion, load_goemotions, load_lt, vectorize
+from data import encode, load_emotion, load_goemotions, load_lt, load_lt_test, vectorize
 from models_a import MODELS_A
 from models_b import MODELS_B
 
@@ -161,9 +161,12 @@ def run(model, seed, study, dev=False, **options):
         # with the vocabulary of this run (built from train only)
         x_go, y_go = load_goemotions(o["task"])
         x_lt, x_en, y_lt = load_lt(o["task"])
-        for name, other, labels in [("go", x_go, y_go), ("lt", x_lt, y_lt), ("en", x_en, y_lt)]:
+        x_lt_test, _, y_lt_test, lt_test_index = load_lt_test(o["task"])   # English side = the test set itself
+        for name, other, labels in [("go", x_go, y_go), ("lt", x_lt, y_lt), ("en", x_en, y_lt),
+                                    ("lt_test", x_lt_test, y_lt_test)]:
             prob = _predict(net, encode(d["vectorizer"], other, mode, o["padding"]))
             predictions.update({f"y_{name}": labels, f"p_{name}": prob.argmax(axis=1), f"prob_{name}": prob})
+        predictions["lt_test_index"] = lt_test_index   # row in the test set, to pair LT and EN predictions
         # S13 keyword test: the same test texts without the emotion word, and with only that word
         kw = keyword_variants(texts["x_test"])
         for name in ["without", "only"]:

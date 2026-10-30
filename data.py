@@ -18,11 +18,22 @@ GOEMOTIONS_LABELS = [
 ]
 
 # The emotion word (keyword rule in data_analysis.py, keyword test S13): the first word after a feel-word,
-# skipping intensifiers and small words, so "i feel so very lonely" -> "lonely"
+# skipping intensifiers and small words, so "i feel so very lonely" -> "lonely". If that word is a pronoun,
+# conjunction, preposition or auxiliary ("i feel like i ...", "i feel as if ..."), the text has no emotion word.
+# The lists were checked on the validation set: keyword rule 71.0 % (first version) -> 73.0 %.
 FEEL_WORDS = {"feel", "feels", "feeling", "felt"}
-SKIP_WORDS = {"so", "very", "really", "a", "bit", "little", "more", "quite", "kind", "of", "like", "that", "too",
-              "pretty", "extremely", "incredibly", "rather", "somewhat", "even", "just", "most", "less", "the",
-              "all", "completely", "totally"}
+SKIP_WORDS = {"so", "very", "really", "a", "an", "bit", "little", "more", "quite", "kind", "sort", "of", "like", "that",
+              "too", "pretty", "extremely", "incredibly", "rather", "somewhat", "even", "just", "most", "less", "the",
+              "all", "completely", "totally", "slightly", "particularly", "absolutely", "especially", "utterly",
+              "strongly", "deeply", "terribly", "almost", "tad", "strangely", "overly", "being", "kinda", "truly",
+              "super", "fairly", "genuinely", "seriously", "increasingly", "awfully", "such", "lot", "much"}
+NOT_EMOTION_WORDS = {"i", "im", "ive", "me", "my", "myself", "you", "your", "he", "hes", "him", "his", "she", "her",
+                     "it", "its", "we", "us", "our", "they", "them", "their", "this", "these", "those", "there",
+                     "theres", "someone", "one", "as", "and", "but", "or", "if", "when", "because", "though", "than",
+                     "how", "what", "who", "about", "to", "in", "for", "at", "on", "out", "from", "with", "some", "any",
+                     "every", "only", "no", "not", "is", "was", "were", "be", "have", "had", "has", "do", "did",
+                     "would", "could", "can", "will"}
+UNKNOWN_WORD = "xxunknownxx"    # not in the vocabulary, so it is encoded as [UNK] (keyword test, S13)
 
 
 def clean_text(text):
@@ -36,9 +47,10 @@ def clean_text(text):
 
 
 def emotion_word(text):
-    """Position of the emotion word in a cleaned text, or None if the text has no feel-word.
+    """Position of the emotion word in a cleaned text, or None if the text has none.
 
     "i feel so humiliated today" -> 3 ("humiliated"); the word itself is text.split()[position].
+    "i feel like i lost something" -> None ("i" is not an emotion word); "nothing here" -> None.
     """
     words = text.split()
     for i, word in enumerate(words[:-1]):
@@ -46,7 +58,7 @@ def emotion_word(text):
             j = i + 1
             while j < len(words) - 1 and words[j] in SKIP_WORDS:   # "so", "very", "a little" ... are skipped
                 j += 1
-            return j
+            return None if words[j] in NOT_EMOTION_WORDS else j
     return None
 
 
@@ -105,6 +117,37 @@ def load_lt_test(task="6"):
     return x_lt, x_en, _labels(df["label"].to_numpy(), task), df["test_index"].to_numpy()
 
 
+def keyword_variants(texts):
+    """Two copies of cleaned texts for the keyword test (S13), built around the emotion word (emotion_word):
+
+    "without": the emotion word replaced by UNKNOWN_WORD, which the vectorizer encodes as [UNK]
+               "i feel so humiliated today" -> "i feel so xxunknownxx today"
+    "only":    the emotion word alone; "humiliated"
+    Texts without an emotion word stay unchanged in "without" and are empty in "only".
+    Also returns "keyword" (the word, or "") and "has_keyword" (bool), all as np.arrays in the order of texts.
+    """
+    without, only, keyword = [], [], []
+    for text in texts:
+        words = text.split()
+        i = emotion_word(text)
+        if i is None:
+            without.append(text)
+            only.append("")
+            keyword.append("")
+        else:
+            without.append(" ".join(words[:i] + [UNKNOWN_WORD] + words[i + 1:]))
+            only.append(words[i])
+            keyword.append(words[i])
+    keyword = np.array(keyword)
+    return {"without": np.array(without), "only": np.array(only), "keyword": keyword, "has_keyword": keyword != ""}
+
+
+def test_in_train(d):
+    """True for each test text whose (cleaned) text is also in train: the duplicates check of the main table."""
+    train = set(d["x_train"])
+    return np.array([text in train for text in d["x_test"]])
+
+
 def vectorize(d, mode="sequence", padding="post"):
     """Turn the texts in d into model input. The vocabulary is built from train only.
 
@@ -124,7 +167,7 @@ def vectorize(d, mode="sequence", padding="post"):
 
 
 def encode(vectorizer, texts, mode="sequence", padding="post"):
-    """Encode any texts (e.g. GoEmotions, LT/EN sentences) with an already fitted vectorizer."""
+    """Encode any texts (e.g. GoEmotions, the LT test set, keyword-test copies) with an already fitted vectorizer."""
     sequences = vectorizer(texts).to_list()       # "i feel happy" -> [2, 3, 57]
     if mode == "sequence":
         # truncating is always "post" (keep the first words), so S2 changes only the padding side
@@ -152,3 +195,23 @@ if __name__ == "__main__":
     d = vectorize(load_emotion())
     print("Masyvų dydžiai:", {k: v.shape for k, v in d.items() if k.startswith(("x_", "y_"))})
     print("Žodyno dydis:", d["vectorizer"].vocabulary_size())
+
+    # Keyword test (S13) on hand-made examples
+    kw = keyword_variants(np.array(["i feel so humiliated today", "i didnt feel humiliated", "i feel very very sad",
+                                    "feeling slightly more optimistic", "a feeling of being invaded",
+                                    "i feel like i lost it", "nothing to see here", "i feel"]))
+    print("Be raktinio žodžio:", kw["without"].tolist())
+    print("Tik raktinis žodis:", kw["only"].tolist())
+    assert list(kw["without"]) == ["i feel so xxunknownxx today", "i didnt feel xxunknownxx",
+                                   "i feel very very xxunknownxx", "feeling slightly more xxunknownxx",
+                                   "a feeling of being xxunknownxx", "i feel like i lost it", "nothing to see here",
+                                   "i feel"]
+    assert list(kw["only"]) == ["humiliated", "humiliated", "sad", "optimistic", "invaded", "", "", ""]
+    assert list(kw["has_keyword"]) == [True, True, True, True, True, False, False, False]
+    assert UNKNOWN_WORD not in d["vectorizer"].get_vocabulary()      # so it really becomes [UNK]
+    assert encode(d["vectorizer"], kw["without"][:1])[0][3] == 1     # 4th word -> index 1 = [UNK]
+
+    # Duplicates check on a hand-made example: only "b" is in both train and test
+    assert list(test_in_train({"x_train": np.array(["a", "b"]), "x_test": np.array(["b", "c"])})) == [True, False]
+    print("Testavimo tekstų, kurie yra ir mokymo imtyje:", test_in_train(load_emotion()).sum())
+    print("Patikrinimai sutampa.")

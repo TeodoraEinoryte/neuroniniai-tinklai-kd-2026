@@ -1,9 +1,9 @@
 .venv/
 __pycache__/
 
-# Trained models: only the best one is committed
+# Trained models: only the app's models are committed (predict.py --save-models)
 results/models/*
-!results/models/best.keras
+!results/models/app/
 
 # Quick test runs (train.py --dev)
 dev/

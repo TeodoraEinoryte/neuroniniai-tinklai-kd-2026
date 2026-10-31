@@ -1,0 +1,16 @@
+{
+  "en": {
+    "run": "S1_bilstm_attention_size64_seed2",
+    "model": "bilstm_attention",
+    "sel_macro_f1": 0.8991,
+    "test_macro_f1": 0.8859,
+    "xtest_macro_f1": 0.9022
+  },
+  "lt": {
+    "run": "S15_conv1d_size128-lt_seed5",
+    "model": "conv1d",
+    "sel_macro_f1": 0.7005,
+    "test_macro_f1": 0.6838,
+    "xtest_macro_f1": 0.6981
+  }
+}

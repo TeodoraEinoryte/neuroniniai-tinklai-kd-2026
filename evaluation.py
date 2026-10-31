@@ -54,6 +54,31 @@ def mcnemar(y, p1, p2):
     return chi2, p_value
 
 
+def bootstrap_diff(y, preds1, preds2, metric="macro_f1", n_classes=6, n=1000, seed=0):
+    """Paired bootstrap: is model 1 better than model 2 on these texts, beyond the luck of which texts were drawn?
+
+    preds1, preds2: lists of prediction arrays, one per seed, for the same texts y. A model's score is its metric
+    ("macro_f1" or "accuracy") averaged over its seeds. Draw len(y) texts with replacement, n times; each time both
+    models are scored on the same drawn texts and the difference score1 - score2 is kept.
+    Returns (diff, ci_low, ci_high, p_value): the difference on all texts, the 2.5 % and 97.5 % points of the n
+    differences (the 95 % confidence interval), and p = twice the share of differences on the other side of 0.
+    """
+    rng = np.random.default_rng(seed)
+
+    def score(preds, texts):
+        return np.mean([metrics(y[texts], p[texts], n_classes)[metric] for p in preds])
+
+    everything = np.arange(len(y))
+    diff = score(preds1, everything) - score(preds2, everything)
+    diffs = []
+    for _ in range(n):
+        texts = rng.integers(0, len(y), len(y))          # the same drawn texts for both models: "paired"
+        diffs.append(score(preds1, texts) - score(preds2, texts))
+    ci_low, ci_high = np.percentile(diffs, [2.5, 97.5])
+    p_value = min(1.0, 2 * min(np.mean(np.array(diffs) <= 0), np.mean(np.array(diffs) >= 0)))
+    return diff, ci_low, ci_high, p_value
+
+
 def holm(p_values, alpha=0.05):
     """Holm–Bonferroni correction for m tests at once (e.g. the best model vs each of 10 others).
 
@@ -162,6 +187,18 @@ if __name__ == "__main__":
     significant = holm([0.01, 0.04, 0.03, 0.005])
     print("Holm:", significant)
     assert significant.tolist() == [True, False, False, True]
+
+    # Paired bootstrap on the same 10 texts, accuracy. By hand: model 2 is right on 9, model 1 on 6, so the
+    # difference on all texts is 0.6 - 0.9 = -0.3. Model 1 is never right where model 2 is wrong (b = 0 above),
+    # so in every draw model 1 scores at most model 2: the interval lies at or below 0.
+    diff, low, high, p_value = bootstrap_diff(y, [p1], [p2], "accuracy", 3)
+    print(f"Bootstrap (tikslumas): skirtumas {diff:.2f}, 95 % intervalas [{low:.2f}; {high:.2f}], p = {p_value:.3f}")
+    assert np.isclose(diff, -0.3) and high <= 0 and low < diff < high
+    # identical models: difference 0 in every draw, p = 1; always right vs always wrong: difference 1, p = 0
+    assert bootstrap_diff(y, [p1], [p1], "accuracy", 3)[1:] == (0.0, 0.0, 1.0)
+    assert bootstrap_diff(y, [y], [(y + 1) % 3], "accuracy", 3) == (1.0, 1.0, 1.0, 0.0)
+    # two seeds per model: the score is the mean over the seeds, (0.6 + 0.9) / 2 - 0.9 = -0.15
+    assert np.isclose(bootstrap_diff(y, [p1, p2], [p2, p2], "accuracy", 3)[0], -0.15)
 
     # Cross-check with Keras (library used only for checking, as for the labs)
     import keras

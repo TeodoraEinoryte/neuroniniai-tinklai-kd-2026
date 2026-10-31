@@ -1,3 +1,4 @@
+import functools
 import json
 import os
 import re
@@ -33,6 +34,7 @@ NOT_EMOTION_WORDS = {"i", "im", "ive", "me", "my", "myself", "you", "your", "he"
                      "how", "what", "who", "about", "to", "in", "for", "at", "on", "out", "from", "with", "some", "any",
                      "every", "only", "no", "not", "is", "was", "were", "be", "have", "had", "has", "do", "did",
                      "would", "could", "can", "will"}
+GLOVE_EXTRA_WORDS = 40000       # S12 "glove-extended": the most frequent GloVe words added to the vocabulary
 UNKNOWN_WORD = "xxunknownxx"    # not in the vocabulary, so it is encoded as [UNK] (keyword test, S13);
                                 # S16 trains with it, so there it is a word of its own
 
@@ -238,17 +240,24 @@ def test_in_train(d):
     return np.array([text in train for text in d["x_test"]])
 
 
-def vectorize(d, mode="sequence", padding="post"):
+def vectorize(d, mode="sequence", padding="post", extra_words=None):
     """Turn the texts in d into model input. The vocabulary is built from train only.
 
     mode "sequence": (n, SEQUENCE_LENGTH) word indices, for Embedding/CNN/RNN/Transformer models.
     mode "multi_hot": (n, VOCAB_SIZE) 0/1 vectors, for logistic regression and MLP.
     padding "post" (zeros at the end) or "pre" (zeros at the start, S2).
+    extra_words: words added after the train vocabulary (S12 "glove-extended": glove_words()); the train words
+                 keep their indices, so only words that were [UNK] change. Sequence mode only.
     Returns a copy of d with the x_* replaced and the fitted "vectorizer" added.
     """
     # Index 0 = padding, 1 = [UNK] (word not among the VOCAB_SIZE most frequent)
     vectorizer = TextVectorization(max_tokens=config.VOCAB_SIZE, ragged=True)
     vectorizer.adapt(d["x_train"])
+    if extra_words is not None:
+        vocabulary = vectorizer.get_vocabulary()                        # ["", "[UNK]", "i", "feel", ...]
+        known = set(vocabulary)
+        vectorizer = TextVectorization(vocabulary=vocabulary[2:] + [w for w in extra_words if w not in known],
+                                       ragged=True)                     # Keras adds "" and "[UNK]" again
 
     result = dict(d, vectorizer=vectorizer)
     for key in ["x_train", "x_val", "x_test"]:
@@ -269,6 +278,44 @@ def encode(vectorizer, texts, mode="sequence", padding="post"):
         x[:, 0] = 0                               # column 0 is padding, never a word
         return x
     raise ValueError(f"Unknown mode: {mode}")
+
+
+@functools.lru_cache(maxsize=1)
+def load_glove(dim=100):
+    """GloVe 6B vectors (Pennington et al., 2014) as a dict word -> np.array (dim,), in the file's order (most
+    frequent words first). The file comes from download_glove.py (data/glove/, ~330 MB, git-ignored).
+    Read once per process (run_study.py runs all S12 runs in one process); do not change the returned dict."""
+    vectors = {}
+    with open(_path(os.path.join("glove", f"glove.6B.{dim}d.txt")), encoding="utf-8") as f:
+        for line in f:
+            word, *values = line.rstrip().split(" ")
+            vectors[word] = np.asarray(values, dtype=np.float32)
+    return vectors
+
+
+def glove_words(n=GLOVE_EXTRA_WORDS, dim=100):
+    """The n most frequent GloVe words that our cleaning can produce (S12 "glove-extended"). GloVe also has
+    punctuation and pieces like "n't" or "'s", which never occur in our texts ("didnt", "its"), so they are skipped
+    rather than given a row of their own."""
+    words = []
+    for word in load_glove(dim):                      # dicts keep the file order: most frequent first
+        if len(words) == n:
+            break
+        if word and clean_text(word) == word:
+            words.append(word)
+    return words
+
+
+def glove_matrix(vectorizer, dim=100):
+    """(vocabulary size, dim) matrix for the Embedding layer (S12): row i = GloVe vector of word i of the
+    vectorizer; zeros for padding, [UNK] and words GloVe does not have."""
+    glove = load_glove(dim)
+    vocabulary = vectorizer.get_vocabulary()
+    matrix = np.zeros((len(vocabulary), dim), dtype=np.float32)
+    for i, word in enumerate(vocabulary[2:], start=2):
+        if word in glove:
+            matrix[i] = glove[word]
+    return matrix
 
 
 def _labels(y, task):
@@ -325,4 +372,17 @@ if __name__ == "__main__":
     # Duplicates check on a hand-made example: only "b" is in both train and test
     assert list(test_in_train({"x_train": np.array(["a", "b"]), "x_test": np.array(["b", "c"])})) == [True, False]
     print("Testavimo tekstų, kurie yra ir mokymo imtyje:", test_in_train(load_emotion()).sum())
+
+    # GloVe (S12), once download_glove.py has been run: row i of the matrix is the vector of word i, zeros for
+    # padding and [UNK]; the extended vocabulary keeps every train word at its index and only adds words after them
+    if os.path.exists(_path(os.path.join("glove", "glove.6B.100d.txt"))):
+        glove, vocabulary = load_glove(), d["vectorizer"].get_vocabulary()
+        matrix = glove_matrix(d["vectorizer"])
+        assert matrix.shape == (config.VOCAB_SIZE, 100) and not matrix[:2].any()
+        assert np.array_equal(matrix[vocabulary.index("happy")], glove["happy"])
+        extended = vectorize(load_emotion(), extra_words=glove_words())["vectorizer"].get_vocabulary()
+        assert extended[:config.VOCAB_SIZE] == vocabulary and len(set(extended)) == len(extended)
+        assert "n't" not in extended and "," not in extended                  # never produced by clean_text
+        print(f"GloVe: {(matrix[2:].any(axis=1)).mean():.1%} žodyno žodžių turi vektorių; "
+              f"išplėstas žodynas {len(extended)} žodžių")
     print("Patikrinimai sutampa.")

@@ -64,7 +64,8 @@ DEFAULTS = {
     "dropout": None,          # S10: Dropout rate before the output layer; None = the model's own default
     "l2": None,               # S10: L2 penalty on the weights
     "layers": None,           # S11: number of Conv1D / recurrent layers; None = 1
-    "embedding": "learned",   # S12: "learned100", "glove-frozen" or "glove-tuned" (all 100-dimensional)
+    "embedding": "learned",   # S12: "learned100", "glove-frozen", "glove-tuned" or "glove-extended" (all 100-d;
+                              #   extended = frozen GloVe, vocabulary + the 40,000 most frequent GloVe words)
     "lang": "en",             # S15: "lt" = train, validate and test on the Lithuanian translation
     "without_keyword": False, # S16: the emotion word replaced by data.UNKNOWN_WORD in train and validation texts
     "corpus": "carer",        # S17: "goemotions" = train on GoEmotions (its own split), test on it and on CARER
@@ -116,7 +117,13 @@ def run(model, seed, study, dev=False, **options):
         # [UNK]: the model knows a word stood there, not which, and [UNK] (rare words, leans to joy) stays apart
         texts = dict(texts, x_train=keyword_variants(texts["x_train"])["without"],
                      x_val=keyword_variants(texts["x_val"])["without"])
-    d = vectorize(texts, mode, o["padding"])
+    # S12 "glove-extended": the most frequent GloVe words join the vocabulary, so words never seen in train
+    # (e.g. in GoEmotions) get a GloVe vector instead of [UNK]
+    extra_words = None
+    if o["embedding"] == "glove-extended":
+        from data import glove_words                 # needs data/glove/ (download_glove.py)
+        extra_words = glove_words()
+    d = vectorize(texts, mode, o["padding"], extra_words)
 
     net = build(size=o["size"], mask=o["mask"], n_classes=n_classes, **_model_extras(o, d["vectorizer"]))
     # Focal loss needs one-hot labels; cross-entropy works with the class numbers directly.
@@ -258,9 +265,9 @@ def _model_extras(o, vectorizer):
     extras = {k: o[k] for k in ["dropout", "l2", "layers"] if o[k] is not None}
     if o["embedding"] == "learned100":
         extras["embedding_dim"] = GLOVE_DIM          # learned vectors of the same size as GloVe
-    elif o["embedding"] in ("glove-frozen", "glove-tuned"):
+    elif o["embedding"] in ("glove-frozen", "glove-tuned", "glove-extended"):
         from data import glove_matrix                # step 3.5 (S12); downloads nothing by itself
-        extras["embedding_matrix"] = glove_matrix(vectorizer, GLOVE_DIM)
+        extras["embedding_matrix"] = glove_matrix(vectorizer, GLOVE_DIM)   # one row per vocabulary word
         extras["trainable"] = o["embedding"] == "glove-tuned"
     return extras
 
@@ -360,7 +367,8 @@ def main():
     parser.add_argument("--dropout", type=float, help="Dropout rate before the output layer (S10)")
     parser.add_argument("--l2", type=float, help="L2 penalty on the weights (S10)")
     parser.add_argument("--layers", type=int, help="number of Conv1D / recurrent layers (S11)")
-    parser.add_argument("--embedding", choices=["learned", "learned100", "glove-frozen", "glove-tuned"], help="S12")
+    parser.add_argument("--embedding", choices=["learned", "learned100", "glove-frozen", "glove-tuned", "glove-extended"],
+                        help="S12")
     parser.add_argument("--lang", choices=["en", "lt"], help="lt: the Lithuanian translation (S15)")
     parser.add_argument("--without-keyword", action="store_true", help="train without the emotion word (S16)")
     parser.add_argument("--corpus", choices=["carer", "goemotions"], help="goemotions: train on GoEmotions (S17)")

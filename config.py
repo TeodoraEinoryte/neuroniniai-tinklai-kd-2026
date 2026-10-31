@@ -4,6 +4,12 @@
 CLASSES_EN = ["sadness", "joy", "love", "anger", "fear", "surprise"]
 CLASSES_LT = ["liūdesys", "džiaugsmas", "meilė", "pyktis", "baimė", "nuostaba"]
 
+# Model names in report tables and figures, in the order of PLAN.md section 5 (+ the DistilBERT competitors)
+MODEL_NAMES_LT = {"logreg": "Logistinė regresija", "mlp": "MLP", "embedding": "Embedding", "conv1d": "Conv1D",
+                  "transformer": "Transformeris", "simplernn": "SimpleRNN", "lstm": "LSTM", "gru": "GRU",
+                  "bilstm": "BiLSTM", "bilstm_attention": "BiLSTM + dėmesys", "distilbert": "DistilBERT",
+                  "distilbert_multi": "Daugiakalbis DistilBERT"}
+
 # Binary version (S5): positive = joy, love, surprise (label 1); negative = sadness, anger, fear (label 0)
 POSITIVE_CLASSES = [1, 2, 5]
 CLASSES_BINARY_LT = ["negatyvi", "pozityvi"]

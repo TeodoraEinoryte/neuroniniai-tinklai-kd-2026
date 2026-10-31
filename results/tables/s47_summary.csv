@@ -1,0 +1,6 @@
+tyrimas (makro F-matas išplėstinėje imtyje; geriausias pagal parinkimo imtį),modelis,geriausias nustatymas,S1,nustatymas,skirtumas išplėstinėje imtyje [95 % PI],p,išvada
+S10 reguliarizacija,Conv1D,"Dropout 0,2","0,896 ± 0,002","0,894 ± 0,003","-0,002 [-0,003; -0,001]","< 0,002","praktiškai lygus, nors reikšmingai blogesnis"
+S10 reguliarizacija,GRU,"L2 0,0001","0,903 ± 0,003","0,903 ± 0,001","-0,000 [-0,001; 0,001]","0,942",praktiškai lygus
+S11 gylis,Conv1D,2 sluoksniai,"0,896 ± 0,002","0,877 ± 0,011","-0,019 [-0,021; -0,017]","< 0,002",blogesnis
+S11 gylis,LSTM,2 sluoksniai,"0,900 ± 0,003","0,896 ± 0,004","-0,004 [-0,006; -0,002]","< 0,002","praktiškai lygus, nors reikšmingai blogesnis"
+S11 gylis,GRU,2 sluoksniai,"0,903 ± 0,003","0,900 ± 0,003","-0,003 [-0,005; -0,002]","< 0,002","praktiškai lygus, nors reikšmingai blogesnis"

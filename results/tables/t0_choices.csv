@@ -1,0 +1,11 @@
+"modelis (parinkimo imtis, makro F-matas, 1–2 sėklos)",dydis,optimizatorius,mokymosi greitis,parinkimo imtis: pasirinktas,"parinkimo imtis: Adam 0,001",skirtumas
+Logistinė regresija,–,SGD + Nesterov,"0,1","0,853","0,822","0,030"
+MLP,64,Adam,"0,001","0,854","0,854","0,000"
+Embedding,64,Adam,"0,001","0,817","0,817","0,000"
+Conv1D,128,Adam,"0,001","0,889","0,889","0,000"
+Transformeris,128,Adam,"0,001","0,865","0,865","0,000"
+SimpleRNN,64,Adam,"0,0003","0,743","0,721","0,023"
+LSTM,128,Adam,"0,01","0,893","0,871","0,022"
+GRU,128,Adam,"0,01","0,898","0,886","0,012"
+BiLSTM,256,Adam,"0,01","0,885","0,870","0,015"
+BiLSTM + dėmesys,64,SGD + Nesterov,"0,3","0,897","0,886","0,011"

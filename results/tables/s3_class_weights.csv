@@ -1,0 +1,11 @@
+modelis (makro F-matas išplėstinėje imtyje),S1,su klasių svoriais,klasių svoriai − S1 [95 % PI],klasių svoriai: išvada,su focal loss,focal loss − S1 [95 % PI],focal loss: išvada
+Logistinė regresija,"0,857 ± 0,001","0,862 ± 0,001","0,005 [0,002; 0,008]","praktiškai lygus, nors reikšmingai geresnis",–,–,–
+MLP,"0,860 ± 0,002","0,865 ± 0,001","0,005 [0,002; 0,008]","praktiškai lygus, nors reikšmingai geresnis",–,–,–
+Embedding,"0,827 ± 0,005","0,839 ± 0,004","0,012 [0,009; 0,015]",geresnis,–,–,–
+Conv1D,"0,896 ± 0,002","0,898 ± 0,002","0,002 [-0,001; 0,004]",praktiškai lygus,"0,894 ± 0,002","-0,002 [-0,003; -0,001]","praktiškai lygus, nors reikšmingai blogesnis"
+Transformeris,"0,872 ± 0,003","0,870 ± 0,003","-0,002 [-0,004; 0,001]",praktiškai lygus,–,–,–
+SimpleRNN,"0,732 ± 0,060","0,778 ± 0,026","0,046 [0,043; 0,049]",geresnis,–,–,–
+LSTM,"0,900 ± 0,003","0,897 ± 0,005","-0,002 [-0,005; -0,000]",praktiškai lygus,–,–,–
+GRU,"0,903 ± 0,003","0,901 ± 0,003","-0,002 [-0,004; 0,001]",praktiškai lygus,"0,899 ± 0,005","-0,004 [-0,006; -0,003]","praktiškai lygus, nors reikšmingai blogesnis"
+BiLSTM,"0,895 ± 0,008","0,897 ± 0,003","0,002 [-0,000; 0,004]",praktiškai lygus,–,–,–
+BiLSTM + dėmesys,"0,902 ± 0,002","0,905 ± 0,004","0,002 [0,000; 0,005]",praktiškai lygus,–,–,–

@@ -37,6 +37,9 @@ BATCH_SIZE = 64
 EPOCHS = 30             # upper limit; EarlyStopping usually stops earlier
 PATIENCE = 3            # EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True)
 SEEDS = [1, 2, 3, 4, 5] # for keras.utils.set_random_seed
+# S1 seeds rule (PLAN.md section 6): the top group's means were within 0.5 points (0.0038 on the extended test,
+# step 4.1), so its members get 3 more seeds; DistilBERT's are run by competitor.py
+S1_EXTRA_SEEDS = {"lstm": [6, 7, 8], "gru": [6, 7, 8], "bilstm_attention": [6, 7, 8]}
 
 # T0a edge rule: models whose best size was the largest of the three get one more size (seeds 1-2 again)
 T0A_EDGE_SIZES = {"lstm": [256], "gru": [256], "bilstm": [256, 512]}  # 128 best at first; BiLSTM then 256 best

@@ -1,0 +1,6 @@
+transformeris (makro F-matas),mokymosi greitis (Adam),sėklų,parinkimo imtis,testavimo imtis,išplėstinė imtis,skirtumas išplėstinėje imtyje [95 % PI],p,išvada
+be kaukės (S1),"0,001",5,"0,866 ± 0,002","0,856 ± 0,004","0,872 ± 0,003",etalonas,–,etalonas
+su kauke,"0,003",5,"0,862 ± 0,002","0,849 ± 0,003","0,866 ± 0,003","-0,006 [-0,007; -0,004]","< 0,002","praktiškai lygus, nors reikšmingai blogesnis"
+"su kauke, Adam 0,001","0,001",2,"0,829 ± 0,019","0,820 ± 0,017","0,830 ± 0,017","-0,042 [-0,044; -0,039]","< 0,002",blogesnis
+tik dėmesio kaukė,"0,001",5,"0,844 ± 0,010","0,830 ± 0,012","0,846 ± 0,008","-0,026 [-0,028; -0,024]","< 0,002",blogesnis
+tik vidurkinimo kaukė,"0,001",5,"0,848 ± 0,005","0,839 ± 0,006","0,853 ± 0,004","-0,019 [-0,021; -0,017]","< 0,002",blogesnis

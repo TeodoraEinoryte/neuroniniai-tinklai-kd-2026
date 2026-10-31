@@ -1,0 +1,13 @@
+"modelis ir užpildymas (bendras tikslumas išplėstinėje imtyje, %, pagal teksto ilgį žodžiais)",1–10,11–20,21–35,> 35
+SimpleRNN: su kauke (S1),"90,4","85,2","77,8","67,3"
+"SimpleRNN: be kaukės, užpildymas po teksto","75,9","59,6","49,4","41,6"
+"SimpleRNN: be kaukės, užpildymas prieš tekstą","89,8","84,2","75,8","63,3"
+LSTM: su kauke (S1),"94,2","93,6","92,8","90,6"
+"LSTM: be kaukės, užpildymas po teksto","81,3","81,3","80,6","77,8"
+"LSTM: be kaukės, užpildymas prieš tekstą","94,2","93,6","92,8","89,9"
+GRU: su kauke (S1),"94,2","93,9","93,5","91,6"
+"GRU: be kaukės, užpildymas po teksto","94,0","93,7","93,1","91,5"
+"GRU: be kaukės, užpildymas prieš tekstą","94,1","93,7","93,1","90,7"
+BiLSTM: su kauke (S1),"94,0","93,6","92,6","90,2"
+"BiLSTM: be kaukės, užpildymas po teksto","93,9","93,4","92,2","89,1"
+"BiLSTM: be kaukės, užpildymas prieš tekstą","94,1","93,5","92,9","90,3"

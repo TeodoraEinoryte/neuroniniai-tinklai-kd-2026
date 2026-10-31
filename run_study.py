@@ -65,7 +65,8 @@ def study_runs(study, dev=False):
         return [dict(model=m, seed=s, size=config.MODEL_SIZES.get(m), optimizer=o, lr=lr)
                 for m in models for o, lr in grid + config.T0B_EDGE_RATES.get(m, []) for s in T0_SEEDS]
     if study == "S1":
-        return [dict(model=m, seed=s) for m in models for s in seeds]
+        return ([dict(model=m, seed=s) for m in models for s in seeds]
+                + [dict(model=m, seed=s) for m, extra in config.S1_EXTRA_SEEDS.items() for s in extra])
     if study == "S2":
         # RNNs: post padding without mask / pre padding without mask; "with mask" is S1
         variants = [dict(mask=False), dict(mask=False, padding="pre")]

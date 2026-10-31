@@ -10,7 +10,7 @@ All five take the same arguments:
                       recurrent layers, output layer (S10); not on the attention pooling
     layers            number of stacked recurrent layers (S11)
     embedding_dim     size of learned word vectors (S12 uses 100)
-    embedding_matrix  GloVe vectors (VOCAB_SIZE x 100) to start the Embedding from, with
+    embedding_matrix  GloVe vectors (one row per vocabulary word x 100) to start the Embedding from, with
     trainable         False = frozen, True = fine-tuned (S12)
 
 Run: python models_b.py   prints each model and checks its parameter count against the lecture 8 formulas.
@@ -128,7 +128,8 @@ def _embedding(mask, embedding_dim, embedding_matrix, trainable, reg=None):
     """Learned word vectors, or GloVe vectors (S12) that are frozen or fine-tuned.
     reg (S10) penalises the vectors only when they are trained; frozen ones cannot change."""
     if embedding_matrix is not None:
-        return Embedding(config.VOCAB_SIZE, embedding_matrix.shape[1], mask_zero=mask, trainable=trainable,
+        # one row per vocabulary word: VOCAB_SIZE, or more with the extended GloVe vocabulary (S12)
+        return Embedding(embedding_matrix.shape[0], embedding_matrix.shape[1], mask_zero=mask, trainable=trainable,
                          embeddings_initializer=keras.initializers.Constant(embedding_matrix),
                          embeddings_regularizer=reg if trainable else None)
     return Embedding(config.VOCAB_SIZE, embedding_dim, mask_zero=mask, embeddings_regularizer=reg)

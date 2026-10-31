@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 from collections import Counter, defaultdict
 
 import matplotlib.pyplot as plt
@@ -8,8 +9,8 @@ import pandas as pd
 
 import config
 import evaluation
-from data import (FEEL_WORDS, emotion_word, goemotions_keep, load_emotion, load_goemotions, load_goemotions_raw,
-                  load_lt_test, vectorize)
+from data import (FEEL_WORDS, emotion_word, goemotions_keep, load_emotion, load_glove, load_goemotions,
+                  load_goemotions_raw, load_lt_test, vectorize)
 
 TABLES_DIR = os.path.join(config.RESULTS_DIR, "tables")
 FIGURES_DIR = os.path.join(config.RESULTS_DIR, "figures")
@@ -174,6 +175,40 @@ def emotion_words(d, n=5):
     return pd.DataFrame(rows)
 
 
+def glove_coverage(d, x_go):
+    """S12: how many of our words have a GloVe vector, per text set and for the emotion words of the test texts.
+
+    Our cleaning merges contractions ("didnt", "im"), which GloVe splits ("did", "n't"), so such words get none.
+    Also the word occurrences outside the train vocabulary (VOCAB_SIZE words; [UNK] for our models) and how many of
+    them GloVe has: those are the words the "glove-extended" arm can give a vector to.
+    """
+    glove = load_glove()
+    vocabulary = set(vectorize(d)["vectorizer"].get_vocabulary())
+    test_keywords = [k for k in map(keyword, d["x_test"]) if k]
+    sets = {"mokymo imtis": d["x_train"], "testavimo imtis": d["x_test"], "GoEmotions": x_go,
+            "testavimo tekstų emocijos žodžiai": test_keywords}
+    rows = {}
+    for name, texts in sets.items():
+        counts = Counter(word for text in texts for word in text.split())
+        total = sum(counts.values())
+        outside = {w: n for w, n in counts.items() if w not in vocabulary}
+        n_outside = sum(outside.values())
+        rows[name] = {
+            "skirtingų žodžių": len(counts),
+            "skirtingų žodžių su GloVe vektoriumi, %": round(sum(w in glove for w in counts) / len(counts) * 100, 1),
+            "žodžių pasikartojimų su GloVe vektoriumi, %": round(sum(n for w, n in counts.items() if w in glove)
+                                                                 / total * 100, 1),
+            "pasikartojimų už mokymo žodyno ribų, %": round(n_outside / total * 100, 1),
+            "iš jų su GloVe vektoriumi, %": round(sum(n for w, n in outside.items() if w in glove)
+                                                  / n_outside * 100, 1) if n_outside else 0.0,
+        }
+    missing = Counter(w for text in d["x_train"] for w in text.split() if w not in glove)
+    print("Dažniausi mokymo imties žodžiai be GloVe vektoriaus:", missing.most_common(15))
+    table = pd.DataFrame(rows).T
+    table["skirtingų žodžių"] = table["skirtingų žodžių"].astype(int)
+    return table
+
+
 def plot_class_distribution(d, path):
     """Share of each emotion in train, validation and test (bars side by side)."""
     splits = [("mokymo", d["y_train"]), ("validavimo", d["y_val"]), ("testavimo", d["y_test"])]
@@ -220,6 +255,12 @@ if __name__ == "__main__":
     os.makedirs(TABLES_DIR, exist_ok=True)
     os.makedirs(FIGURES_DIR, exist_ok=True)
     d = load_emotion()
+    if sys.argv[1:] == ["glove"]:
+        # python data_analysis.py glove: only the GloVe coverage (S12; needs download_glove.py first)
+        coverage = glove_coverage(d, load_goemotions()[0])
+        print(coverage.to_string())
+        save(coverage, "glove_coverage.csv", index_label="rinkinys", lineterminator="\n")
+        sys.exit()
     print("Imčių dydžiai:", len(d["y_train"]), len(d["y_val"]), len(d["y_test"]))
 
     classes = class_distribution(d)

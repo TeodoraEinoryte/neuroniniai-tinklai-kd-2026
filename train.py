@@ -66,7 +66,7 @@ DEFAULTS = {
     "layers": None,           # S11: number of Conv1D / recurrent layers; None = 1
     "embedding": "learned",   # S12: "learned100", "glove-frozen" or "glove-tuned" (all 100-dimensional)
     "lang": "en",             # S15: "lt" = train, validate and test on the Lithuanian translation
-    "without_keyword": False, # S16: the emotion word replaced by an unknown word in train and validation texts
+    "without_keyword": False, # S16: the emotion word replaced by data.UNKNOWN_WORD in train and validation texts
     "corpus": "carer",        # S17: "goemotions" = train on GoEmotions (its own split), test on it and on CARER
 }
 GLOVE_DIM = 100
@@ -111,7 +111,9 @@ def run(model, seed, study, dev=False, **options):
     else:
         texts = load_emotion(o["task"], fraction, seed, o["lang"])
     if o["without_keyword"]:
-        # S16: the emotion word becomes the unknown-word placeholder everywhere it occurs (as in the test copy)
+        # S16: the emotion word becomes the placeholder everywhere it occurs (as in the test copy). It is replaced
+        # before the vocabulary is built, so the placeholder is a word of its own there (3rd most frequent), not
+        # [UNK]: the model knows a word stood there, not which, and [UNK] (rare words, leans to joy) stays apart
         texts = dict(texts, x_train=keyword_variants(texts["x_train"])["without"],
                      x_val=keyword_variants(texts["x_val"])["without"])
     d = vectorize(texts, mode, o["padding"])
@@ -203,8 +205,11 @@ def run(model, seed, study, dev=False, **options):
         predictions["lt_test_index"] = lt_test_index   # row in the test set, to pair LT and EN predictions
     if study in ("S1", "S12", "S16"):
         # S13 keyword test: the same test texts without the emotion word, with only it, as "i feel <word>",
-        # and the control (another word unknown); a text counts only if its emotion word is in this run's vocabulary
-        kw = keyword_variants(texts["x_test"], vocabulary=set(d["vectorizer"].get_vocabulary()))
+        # and the control (another word unknown); a text counts only if its emotion word is in this run's vocabulary.
+        # S16 replaces every emotion word, as in its training texts: its vocabulary lacks 54 test emotion words,
+        # which would otherwise stay in the text and reach the model as [UNK] instead of the placeholder
+        vocabulary = None if o["without_keyword"] else set(d["vectorizer"].get_vocabulary())
+        kw = keyword_variants(texts["x_test"], vocabulary=vocabulary)
         for name in ["without", "only", "i_feel", "control"]:
             prob = _predict(net, encode(d["vectorizer"], kw[name], mode, o["padding"]))
             predictions.update({f"p_kw_{name}": prob.argmax(axis=1), f"prob_kw_{name}": prob})

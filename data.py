@@ -33,7 +33,8 @@ NOT_EMOTION_WORDS = {"i", "im", "ive", "me", "my", "myself", "you", "your", "he"
                      "how", "what", "who", "about", "to", "in", "for", "at", "on", "out", "from", "with", "some", "any",
                      "every", "only", "no", "not", "is", "was", "were", "be", "have", "had", "has", "do", "did",
                      "would", "could", "can", "will"}
-UNKNOWN_WORD = "xxunknownxx"    # not in the vocabulary, so it is encoded as [UNK] (keyword test, S13)
+UNKNOWN_WORD = "xxunknownxx"    # not in the vocabulary, so it is encoded as [UNK] (keyword test, S13);
+                                # S16 trains with it, so there it is a word of its own
 
 
 def clean_text(text):

@@ -47,16 +47,20 @@ def study_runs(study, dev=False):
                 for m in SIDE_MODELS for o in train.OPTIMIZERS for s in seeds]
     if study == "T0a":
         # every model x its 3 sizes (logreg: its only setting, the "x 1" of its T0b) x seeds 1-2, Adam 0.001
-        # set explicitly, so T0a stays the same after T0b fills MODEL_OPTIMIZERS; chosen on the selection set
+        # set explicitly, so T0a stays the same after T0b fills MODEL_OPTIMIZERS; chosen on the selection set.
+        # Edge rule: config.T0A_EDGE_SIZES adds one more size for models whose best was at the end of the grid
         return [dict(model=m, seed=s, size=size, optimizer=config.OPTIMIZER, lr=config.LEARNING_RATE)
-                for m in models for size in (train.MODELS[m][2] or [None]) for s in T0_SEEDS]
+                for m in models for size in (train.MODELS[m][2] or [None]) + config.T0A_EDGE_SIZES.get(m, [])
+                for s in T0_SEEDS]
     if study == "T0b":
-        # every model at its T0a size x the optimiser-rate pairs of config.T0B_GRID x seeds 1-2 (Adam 0.001 is T0a)
+        # every model at its T0a size x the optimiser-rate pairs of config.T0B_GRID x seeds 1-2 (Adam 0.001 is T0a).
+        # Edge rule: config.T0B_EDGE_RATES adds one more pair for models whose best rate was at the end of a list
         missing = [m for m in models if train.MODELS[m][2] and m not in config.MODEL_SIZES]
         if missing:
             raise ValueError(f"Fill config.MODEL_SIZES from the T0a results first; missing: {missing}")
+        grid = [(o, lr) for o, rates in config.T0B_GRID.items() for lr in rates]
         return [dict(model=m, seed=s, size=config.MODEL_SIZES.get(m), optimizer=o, lr=lr)
-                for m in models for o, rates in config.T0B_GRID.items() for lr in rates for s in T0_SEEDS]
+                for m in models for o, lr in grid + config.T0B_EDGE_RATES.get(m, []) for s in T0_SEEDS]
     if study == "S1":
         return [dict(model=m, seed=s) for m in models for s in seeds]
     if study == "S2":

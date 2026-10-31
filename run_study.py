@@ -16,7 +16,8 @@ import train
 
 T0_SEEDS = [1, 2]
 RNN_MODELS = ["simplernn", "lstm", "gru", "bilstm"]                  # S2: models with a hidden state
-S2_SEARCH_RATES = [0.0003, 0.001, 0.003]          # S2: Adam rates tried for the Transformer with the mask (seeds 1-2)
+# S2: Adam rates tried for the Transformer with the mask (seeds 1-2); 0.01 is the edge-rule step (0.003 was best)
+S2_SEARCH_RATES = [0.0003, 0.001, 0.003, 0.01]
 S4_FRACTIONS = [1 / 16, 1 / 8, 1 / 4, 1 / 2, 1.0]                    # 1k, 2k, 4k, 8k, 16k train texts
 # S4, S5: logreg + the best non-recurrent and the best recurrent model of S1 on the selection set: Conv1D (0.8905);
 # GRU (0.8973) and BiLSTM + attention (0.8974) tie, GRU is simpler, 2.4 times faster and the side studies' model

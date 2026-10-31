@@ -60,8 +60,9 @@ T0B_GRID = {"adam": [0.0003, 0.003, 0.01], "nesterov": [0.03, 0.1, 0.3]}
 T0B_EDGE_RATES = {"simplernn": [("adam", 0.0001)], "lstm": [("adam", 0.03)], "gru": [("adam", 0.03)],
                   "bilstm": [("adam", 0.03)], "bilstm_attention": [("nesterov", 1.0)]}   # best pair at an end at first
 
-# S2: learning rate of the Transformer with the mask, chosen from its own short search (step 3.2); None until then
-S2_MASKED_TRANSFORMER_LR = None
+# S2: learning rate of the Transformer with the mask, chosen from its own short search (step 3.2): mean selection-set
+# macro-F1 of seeds 1-2 at Adam 0.0003 / 0.001 / 0.003 / 0.01 (edge step) = 0.804 / 0.829 / 0.861 / 0.853
+S2_MASKED_TRANSFORMER_LR = 0.003
 
 # S9: best learning rate of each optimiser from the S9a grid (highest mean validation macro-F1 of Conv1D and GRU,
 # seed 1; step 2.3)

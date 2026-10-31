@@ -96,8 +96,9 @@ def study_runs(study, dev=False):
         # 2 layers; "1 layer" is S1
         return [dict(model=m, seed=s, layers=2) for m in ["conv1d", "lstm", "gru"] for s in seeds]
     if study == "S12":
-        # learned 100-d vectors vs GloVe 100-d frozen vs GloVe 100-d fine-tuned
-        variants = ["learned100", "glove-frozen", "glove-tuned"]
+        # learned 100-d vectors vs GloVe 100-d frozen vs GloVe 100-d fine-tuned vs GloVe frozen with the vocabulary
+        # extended by the 40,000 most frequent GloVe words (words unseen in train get vectors too)
+        variants = ["learned100", "glove-frozen", "glove-tuned", "glove-extended"]
         return [dict(model=m, seed=s, embedding=e) for m in SIDE_MODELS for e in variants for s in seeds]
     if study == "S15":
         # all 10 models trained on the Lithuanian translation, with their English T0 settings; English is S1

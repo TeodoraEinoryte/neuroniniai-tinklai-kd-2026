@@ -1,0 +1,5 @@
+rinkinys,skirtingų žodžių,"skirtingų žodžių su GloVe vektoriumi, %","žodžių pasikartojimų su GloVe vektoriumi, %","pasikartojimų už mokymo žodyno ribų, %","iš jų su GloVe vektoriumi, %"
+mokymo imtis,15212,93.4,99.6,1.7,87.9
+testavimo imtis,4796,97.1,99.6,3.6,91.4
+GoEmotions,8900,92.3,98.9,7.9,87.4
+testavimo tekstų emocijos žodžiai,541,98.3,99.4,2.9,86.0

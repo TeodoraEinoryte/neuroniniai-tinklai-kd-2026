@@ -11,7 +11,7 @@ Conv1D, a side model, also takes (train.py passes them only when a study changes
     l2                L2 penalty on all weights: Embedding (if trained), Conv1D and output layers (S10)
     layers            number of stacked Conv1D layers; default 1 (S11)
     embedding_dim     size of learned word vectors; default config.EMBEDDING_DIM (S12 uses 100)
-    embedding_matrix  GloVe vectors (VOCAB_SIZE x 100) to start the Embedding from, with
+    embedding_matrix  GloVe vectors (one row per vocabulary word x 100) to start the Embedding from, with
     trainable         False = frozen, True = fine-tuned (S12)
 
 Run: python models_a.py   prints each model and checks its parameter count against the formulas.
@@ -63,7 +63,8 @@ def build_conv1d(size=128, mask=True, n_classes=6, dropout=0.0, l2=None, layers=
     response of each filter anywhere in the text is kept (GlobalMaxPooling): a learned keyword detector."""
     reg = regularizers.l2(l2) if l2 else None
     if embedding_matrix is not None:
-        embedding = Embedding(config.VOCAB_SIZE, embedding_matrix.shape[1], trainable=trainable,
+        # one row per vocabulary word: VOCAB_SIZE, or more with the extended GloVe vocabulary (S12)
+        embedding = Embedding(embedding_matrix.shape[0], embedding_matrix.shape[1], trainable=trainable,
                               embeddings_initializer=keras.initializers.Constant(embedding_matrix),
                               embeddings_regularizer=reg if trainable else None)   # frozen vectors cannot change
     else:

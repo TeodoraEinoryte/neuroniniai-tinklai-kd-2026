@@ -62,21 +62,34 @@ def emotion_word(text):
     return None
 
 
-def load_emotion(task="6", fraction=1.0, seed=1):
+def load_emotion(task="6", fraction=1.0, seed=1, lang="en"):
     """Load dair-ai/emotion as numpy arrays of texts (x) and labels (y).
 
     task: "6" = six emotions, "2" = positive/negative (S5).
     fraction: stratified share of train to keep (S4); validation and test are never reduced.
+    lang: "en", or "lt" = the same texts machine-translated into Lithuanian (S15; lt_*.csv, same row order).
     """
     d = {}
     for name, split in [("train", "train"), ("val", "validation"), ("test", "test")]:
-        df = pd.read_csv(_path(f"emotion_{split}.csv"))
+        if lang == "lt":
+            df = pd.read_csv(_path(f"lt_{split}.csv")).rename(columns={"text_lt": "text"})
+        else:
+            df = pd.read_csv(_path(f"emotion_{split}.csv"))
         if name == "train" and fraction < 1.0:
             # the same share from every class, so class proportions stay the same
             df = df.groupby("label").sample(frac=fraction, random_state=seed)
-        d[f"x_{name}"] = df["text"].map(clean_text).to_numpy()   # already clean in the source; kept for consistency
+        d[f"x_{name}"] = df["text"].map(clean_text).to_numpy()   # English is already clean; kept for consistency
         d[f"y_{name}"] = _labels(df["label"].to_numpy(), task)
     return d
+
+
+def load_carer_extra(part, task="6", lang="en"):
+    """Extra CARER texts, never trained on (download_carer_extra.py, PLAN.md section 3):
+    part "select" = selection set (20,000; all choices in T0), "xtest" = extended test (50,000).
+    Returns (x, y); lang "lt" gives the Lithuanian translation of the same texts."""
+    df = pd.read_csv(_path(f"carer_{part}.csv"))
+    x = df["text_lt" if lang == "lt" else "text_en"].map(clean_text).to_numpy()
+    return x, _labels(df["label"].to_numpy(), task)
 
 
 def load_goemotions_raw():
@@ -104,6 +117,19 @@ def load_goemotions(task="6"):
     return x, _labels(y, task)
 
 
+def load_goemotions_splits(task="6"):
+    """GoEmotions with our 6 emotions, by its own split (5,272 / 625 / 638 texts), for training on it (S17).
+    Returns the same dict as load_emotion."""
+    d = {}
+    for name, split in [("train", "train"), ("val", "validation"), ("test", "test")]:
+        df = pd.read_csv(_path(f"goemotions_{split}.csv"))
+        df["names"] = df["labels"].map(lambda labels: [GOEMOTIONS_LABELS[i] for i in json.loads(labels)])
+        df = df[goemotions_keep(df["names"])]
+        d[f"x_{name}"] = df["text"].map(clean_text).to_numpy()
+        d[f"y_{name}"] = _labels(df["names"].map(lambda n: config.CLASSES_EN.index(n[0])).to_numpy(), task)
+    return d
+
+
 def load_lt_test(task="6"):
     """Our 2,000 test texts machine-translated into Lithuanian (download_lt_test.py); for testing only.
 
@@ -117,29 +143,92 @@ def load_lt_test(task="6"):
     return x_lt, x_en, _labels(df["label"].to_numpy(), task), df["test_index"].to_numpy()
 
 
-def keyword_variants(texts):
-    """Two copies of cleaned texts for the keyword test (S13), built around the emotion word (emotion_word):
+def keyword_variants(texts, vocabulary=None, seed=0):
+    """Copies of cleaned texts for the keyword test (S13), built around the emotion word (emotion_word):
 
-    "without": the emotion word replaced by UNKNOWN_WORD, which the vectorizer encodes as [UNK]
-               "i feel so humiliated today" -> "i feel so xxunknownxx today"
-    "only":    the emotion word alone; "humiliated"
-    Texts without an emotion word stay unchanged in "without" and are empty in "only".
+    "without": every occurrence of the emotion word replaced by UNKNOWN_WORD, which the vectorizer encodes as [UNK]
+               "i feel crappy i eat crappy" -> "i feel xxunknownxx i eat xxunknownxx"
+    "only":    the emotion word alone; "crappy"
+    "i_feel":  "i feel" + the emotion word, so the input is not unusually short; "i feel crappy"
+    "control": one random other word of the text replaced by UNKNOWN_WORD instead, to separate
+               "lost the emotion word" from "got an [UNK]"
+    A text counts as a keyword text only if it has an emotion word and, when vocabulary (a set of words) is given,
+    the word is in it; otherwise replacing it would change nothing. Other texts stay unchanged in "without" and
+    "control" and are empty in "only" and "i_feel".
     Also returns "keyword" (the word, or "") and "has_keyword" (bool), all as np.arrays in the order of texts.
     """
-    without, only, keyword = [], [], []
+    rng = np.random.default_rng(seed)
+    without, only, i_feel, control, keyword = [], [], [], [], []
     for text in texts:
         words = text.split()
         i = emotion_word(text)
-        if i is None:
+        word = words[i] if i is not None else ""
+        if word == "" or (vocabulary is not None and word not in vocabulary):
             without.append(text)
             only.append("")
+            i_feel.append("")
+            control.append(text)
             keyword.append("")
-        else:
-            without.append(" ".join(words[:i] + [UNKNOWN_WORD] + words[i + 1:]))
-            only.append(words[i])
-            keyword.append(words[i])
+            continue
+        without.append(" ".join(UNKNOWN_WORD if w == word else w for w in words))
+        only.append(word)
+        i_feel.append(f"i feel {word}")
+        others = [j for j, w in enumerate(words) if w != word and (vocabulary is None or w in vocabulary)]
+        if others:
+            j = others[rng.integers(len(others))]
+            words = words[:j] + [UNKNOWN_WORD] + words[j + 1:]
+        control.append(" ".join(words))
+        keyword.append(word)
     keyword = np.array(keyword)
-    return {"without": np.array(without), "only": np.array(only), "keyword": keyword, "has_keyword": keyword != ""}
+    return {"without": np.array(without), "only": np.array(only), "i_feel": np.array(i_feel),
+            "control": np.array(control), "keyword": keyword, "has_keyword": keyword != ""}
+
+
+def keyword_counts(train_texts, train_labels):
+    """For every emotion word in train: how many train texts of each class it is the emotion word of."""
+    counts = {}
+    for text, label in zip(train_texts, train_labels):
+        i = emotion_word(text)
+        if i is not None:
+            word = text.split()[i]
+            counts.setdefault(word, np.zeros(6, dtype=int))[label] += 1
+    return counts
+
+
+def keyword_groups(texts, train_texts, train_labels, purity=0.95):
+    """Group of each text by its emotion word (S13; PLAN.md section 3):
+    "pure"      the word's train texts have its most common label at least `purity` of the time
+    "ambiguous" the word is an emotion word in train, but less pure
+    "none"      the text has no emotion word
+    "unseen"    the word never is an emotion word in train
+    """
+    counts = keyword_counts(train_texts, train_labels)
+    groups = []
+    for text in texts:
+        i = emotion_word(text)
+        if i is None:
+            groups.append("none")
+            continue
+        c = counts.get(text.split()[i])
+        if c is None:
+            groups.append("unseen")
+        else:
+            groups.append("pure" if c.max() / c.sum() >= purity else "ambiguous")
+    return np.array(groups)
+
+
+def negation_templates(train_texts, train_labels, per_class=10, purity=0.95):
+    """Negation test sentences (S13, CheckList): the per_class most frequent pure emotion words of each class
+    (the same purity as keyword_groups) in "i feel X", "i dont feel X" and "i never feel X".
+    Returns a DataFrame with columns word, label, template, text; no gold label is needed for the test."""
+    counts = keyword_counts(train_texts, train_labels)
+    rows = []
+    for label in range(6):
+        pure = [(c.sum(), w) for w, c in counts.items() if c.argmax() == label and c.max() / c.sum() >= purity]
+        for _, word in sorted(pure, reverse=True)[:per_class]:
+            for template in ["i feel {}", "i dont feel {}", "i never feel {}"]:
+                rows.append({"word": word, "label": label, "template": template, "text": template.format(word)})
+    return pd.DataFrame(rows)
 
 
 def test_in_train(d):
@@ -199,17 +288,38 @@ if __name__ == "__main__":
     # Keyword test (S13) on hand-made examples
     kw = keyword_variants(np.array(["i feel so humiliated today", "i didnt feel humiliated", "i feel very very sad",
                                     "feeling slightly more optimistic", "a feeling of being invaded",
-                                    "i feel like i lost it", "nothing to see here", "i feel"]))
+                                    "i feel like i lost it", "nothing to see here", "i feel",
+                                    "i feel crappy i eat crappy"]))
     print("Be raktinio žodžio:", kw["without"].tolist())
     print("Tik raktinis žodis:", kw["only"].tolist())
     assert list(kw["without"]) == ["i feel so xxunknownxx today", "i didnt feel xxunknownxx",
                                    "i feel very very xxunknownxx", "feeling slightly more xxunknownxx",
                                    "a feeling of being xxunknownxx", "i feel like i lost it", "nothing to see here",
-                                   "i feel"]
-    assert list(kw["only"]) == ["humiliated", "humiliated", "sad", "optimistic", "invaded", "", "", ""]
-    assert list(kw["has_keyword"]) == [True, True, True, True, True, False, False, False]
+                                   "i feel", "i feel xxunknownxx i eat xxunknownxx"]   # every occurrence
+    assert list(kw["only"]) == ["humiliated", "humiliated", "sad", "optimistic", "invaded", "", "", "", "crappy"]
+    assert kw["i_feel"][0] == "i feel humiliated" and kw["i_feel"][5] == ""
+    assert list(kw["has_keyword"]) == [True, True, True, True, True, False, False, False, True]
+    # control: exactly one other word becomes the unknown word, the emotion word stays
+    control = kw["control"][0].split()
+    assert sum(a != b for a, b in zip(control, "i feel so humiliated today".split())) == 1
+    assert UNKNOWN_WORD in control and "humiliated" in control
+    # a word outside the vocabulary would be [UNK] in both copies, so the text does not count as a keyword text
+    small = keyword_variants(np.array(["i feel so humiliated today"]), vocabulary={"i", "feel", "so", "today"})
+    assert not small["has_keyword"][0] and small["without"][0] == "i feel so humiliated today"
     assert UNKNOWN_WORD not in d["vectorizer"].get_vocabulary()      # so it really becomes [UNK]
     assert encode(d["vectorizer"], kw["without"][:1])[0][3] == 1     # 4th word -> index 1 = [UNK]
+
+    # Keyword groups and negation templates on a hand-made train set: "sad" always class 0, "odd" half 0 half 1
+    train_x, train_y = np.array(["i feel sad", "i feel sad", "i feel odd", "i feel odd"]), np.array([0, 0, 0, 1])
+    groups = keyword_groups(np.array(["i feel sad today", "i feel odd", "nothing here", "i feel happy"]),
+                            train_x, train_y)
+    assert list(groups) == ["pure", "ambiguous", "none", "unseen"]
+    templates = negation_templates(train_x, train_y, per_class=1)
+    assert list(templates["text"]) == ["i feel sad", "i dont feel sad", "i never feel sad"]   # "odd" is not pure
+    e = load_emotion()
+    groups = keyword_groups(e["x_test"], e["x_train"], e["y_train"])
+    print("Raktinio žodžio grupės (testavimo imtis):",
+          {g: f"{(groups == g).mean():.1%}" for g in ["pure", "ambiguous", "none", "unseen"]})
 
     # Duplicates check on a hand-made example: only "b" is in both train and test
     assert list(test_in_train({"x_train": np.array(["a", "b"]), "x_test": np.array(["b", "c"])})) == [True, False]

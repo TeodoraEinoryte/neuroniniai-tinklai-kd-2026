@@ -22,22 +22,31 @@ EMBEDDING_DIM = 64
 # without it on validation (90.8 % vs 85.9 % and 88.6 % with the mask, seeds 1 and 2; step 2.1); S2 measures it.
 NO_MASK_MODELS = ["transformer"]
 
-# Optimiser of every run except S9; S9 compares 8 optimisers and may replace this choice before T0 (step 2.3)
+# Default optimiser and learning rate: T0a runs with them, and a model keeps them unless T0b finds a pair that is
+# better by more than TIE_MARGIN on the selection set (PLAN.md, section 4)
 OPTIMIZER = "adam"
 LEARNING_RATE = 0.001
+TIE_MARGIN = 0.005      # macro-F1; the default (middle T0a size, Adam 0.001) stays unless beaten by more
 BATCH_SIZE = 64
 EPOCHS = 30             # upper limit; EarlyStopping usually stops earlier
 PATIENCE = 3            # EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True)
 SEEDS = [1, 2, 3, 4, 5] # for keras.utils.set_random_seed
 
-# Size chosen in T0a for each model, e.g. {"lstm": 64}; filled at step 2.4.
-# Until then train.py uses the middle T0 value.
+# Size chosen in T0a for each tuned model, e.g. {"lstm": 64}; filled at step 2.4.
+# Until then train.py uses the middle T0 value. S1 and later studies refuse to start until it is filled.
 MODEL_SIZES = {}
 
-# Learning rate chosen in T0b for each model (LEARNING_RATE x 0.3 / x 1 / x 3), e.g. {"transformer": 0.0003};
-# filled at step 2.4. Models not listed use LEARNING_RATE.
+# Optimiser and learning rate chosen in T0b for every model (all 10, logreg too), e.g. {"gru": "nesterov"} and
+# {"gru": 0.1}; filled at step 2.4. Until then train.py uses OPTIMIZER and LEARNING_RATE.
+MODEL_OPTIMIZERS = {}
 MODEL_LEARNING_RATES = {}
-T0B_FACTORS = [0.3, 3]    # x 1 is the T0a run itself
+
+# T0b grid: the best adaptive and the best momentum optimiser of S9, each around its S9 rate (Adam 0.001 is the
+# T0a run itself). Edge rule: if a model's best rate is at an end of a list, add one more x 3 step there and rerun T0b.
+T0B_GRID = {"adam": [0.0003, 0.003, 0.01], "nesterov": [0.03, 0.1, 0.3]}
+
+# S2: learning rate of the Transformer with the mask, chosen from its own short search (step 3.2); None until then
+S2_MASKED_TRANSFORMER_LR = None
 
 # S9: best learning rate of each optimiser from the S9a grid (highest mean validation macro-F1 of Conv1D and GRU,
 # seed 1; step 2.3)

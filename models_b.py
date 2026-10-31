@@ -6,7 +6,8 @@ All five take the same arguments:
     mask              Embedding(mask_zero=True): the recurrent layer skips the padding zeros (S2 turns it off)
     n_classes         6 emotions, or 2 for the binary version (S5)
     dropout           Dropout rate before the output layer; default 0 = no Dropout layer (S10)
-    l2                L2 penalty on the kernel weights of the recurrent and output layers (S10)
+    l2                L2 penalty on all weights: Embedding (if trained), input and recurrent kernels of the
+                      recurrent layers, output layer (S10); not on the attention pooling
     layers            number of stacked recurrent layers (S11)
     embedding_dim     size of learned word vectors (S12 uses 100)
     embedding_matrix  GloVe vectors (VOCAB_SIZE x 100) to start the Embedding from, with
@@ -59,9 +60,10 @@ def build_bilstm_attention(size=64, mask=True, n_classes=6, dropout=0.0, l2=None
     """
     reg = regularizers.l2(l2) if l2 else None
     inputs = Input(shape=(config.SEQUENCE_LENGTH,))
-    x = _embedding(mask, embedding_dim, embedding_matrix, trainable)(inputs)
+    x = _embedding(mask, embedding_dim, embedding_matrix, trainable, reg)(inputs)
     for _ in range(layers):
-        x = Bidirectional(LSTM(size, return_sequences=True, kernel_regularizer=reg))(x)   # (None, 50, 2*size)
+        lstm = LSTM(size, return_sequences=True, kernel_regularizer=reg, recurrent_regularizer=reg)
+        x = Bidirectional(lstm)(x)                                                         # (None, 50, 2*size)
     context, _ = AttentionPooling(name="attention")(x)                                    # (None, 2*size)
     if dropout:
         context = Dropout(dropout)(context)
@@ -110,11 +112,11 @@ def _recurrent_model(cell, bidirectional, size, mask, n_classes, dropout, l2, la
     reg = regularizers.l2(l2) if l2 else None
     model = keras.Sequential([
         Input(shape=(config.SEQUENCE_LENGTH,)),
-        _embedding(mask, embedding_dim, embedding_matrix, trainable),
+        _embedding(mask, embedding_dim, embedding_matrix, trainable, reg),
     ])
     for i in range(layers):
         # all but the last layer return the whole sequence, so the next layer gets one vector per word
-        rnn = cell(size, return_sequences=i < layers - 1, kernel_regularizer=reg)
+        rnn = cell(size, return_sequences=i < layers - 1, kernel_regularizer=reg, recurrent_regularizer=reg)
         model.add(Bidirectional(rnn) if bidirectional else rnn)
     if dropout:
         model.add(Dropout(dropout))
@@ -122,12 +124,14 @@ def _recurrent_model(cell, bidirectional, size, mask, n_classes, dropout, l2, la
     return model
 
 
-def _embedding(mask, embedding_dim, embedding_matrix, trainable):
-    """Learned word vectors, or GloVe vectors (S12) that are frozen or fine-tuned."""
+def _embedding(mask, embedding_dim, embedding_matrix, trainable, reg=None):
+    """Learned word vectors, or GloVe vectors (S12) that are frozen or fine-tuned.
+    reg (S10) penalises the vectors only when they are trained; frozen ones cannot change."""
     if embedding_matrix is not None:
         return Embedding(config.VOCAB_SIZE, embedding_matrix.shape[1], mask_zero=mask, trainable=trainable,
-                         embeddings_initializer=keras.initializers.Constant(embedding_matrix))
-    return Embedding(config.VOCAB_SIZE, embedding_dim, mask_zero=mask)
+                         embeddings_initializer=keras.initializers.Constant(embedding_matrix),
+                         embeddings_regularizer=reg if trainable else None)
+    return Embedding(config.VOCAB_SIZE, embedding_dim, mask_zero=mask, embeddings_regularizer=reg)
 
 
 # name: (function, input type for data.vectorize, T0 values)

@@ -585,7 +585,8 @@ AUDIT_SHARE = 0.8              # a text counts as hard if at least 80 % of the S
 AUDIT_SEED = 2026
 # Error categories (results/audit/README.md). We label only what needs a person, codes 0–3; for code 0 the
 # category follows from the text's keyword group (data.keyword_groups), the same groups as in S13 and report 4.8
-HUMAN_LT = ["nė viena", "žymė klaidinga arba dviprasmiška", "neigimas", "sarkazmas ar ironija"]
+HUMAN_LT = ["nė viena", "žymė nepatikima (klaidinga, dviprasmiška arba aiškios emocijos nėra)", "neigimas",
+            "sarkazmas ar ironija"]
 AUTO_LT = {"none": "nėra emocijos žodžio", "ambiguous": "daugiareikšmis emocijos žodis",
            "unseen": "mokymo imtyje nematytas emocijos žodis", "pure": "tikra modelio klaida"}
 CATEGORIES_LT = HUMAN_LT[1:] + list(AUTO_LT.values())   # the final categories, in the guide's order

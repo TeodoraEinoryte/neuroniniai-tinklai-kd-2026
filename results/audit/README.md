@@ -5,7 +5,7 @@
 - `audit_sample.csv` – 100 sunkiausių tekstų ir jų duomenys. Tai tekstai iš išplėstinės testavimo imties, kuriuos klaidingai atpažįsta bent 80 % visų S1 paleidimų (tokių yra 702, iš jų atsitiktinai atrinkta 100, sėkla 2026). Oficialioje testavimo imtyje tokių tekstų tik 33, todėl imta išplėstinė.
 - `audit_A.csv` – žymi **Teodora (A)**, `audit_B.csv` – žymi **Edgaras (B)**. Abiejuose tie patys 100 tekstų.
 
-Tikslas – įvertinti, kiek likusių klaidų yra ne modelių kaltė (klaidinga žymė, kalbos reiškinys, duomenų trūkumas), o kiek – tikros modelio klaidos.
+Tikslas – įvertinti, kiek likusių klaidų yra ne modelių kaltė (nepatikima žymė, kalbos reiškinys, duomenų trūkumas), o kiek – tikros modelio klaidos.
 
 ## Kas sprendžia žmogus, o kas – programa
 
@@ -15,7 +15,7 @@ Tikslas – įvertinti, kiek likusių klaidų yra ne modelių kaltė (klaidinga 
 
 | Kodas | Kategorija | Kada |
 |---|---|---|
-| 1 | Žymė klaidinga arba dviprasmiška | **Klaidinga** – perskaitęs tekstą aiškiai pasirinktum kitą emociją. **Dviprasmiška** – tekstas vienodai tinka dviem emocijoms (žymei ir prognozei). Žymės duomenų rinkinyje sudarytos automatiškai pagal emocijos žodį, todėl tokių atvejų gali būti nemažai. |
+| 1 | Žymė nepatikima (klaidinga, dviprasmiška arba aiškios emocijos nėra) | **Klaidinga** – perskaitęs tekstą aiškiai pasirinktum kitą emociją. **Dviprasmiška** – tekstas vienodai tinka dviem emocijoms (žymei ir prognozei). **Aiškios emocijos nėra** – negalėtum pasirinkti nė vienos iš 6 emocijų (netinka nei žymė, nei prognozė, nei kita); jei emocija silpna, bet žymė tinka – tai 0, ne 1. Žymės duomenų rinkinyje sudarytos automatiškai pagal emocijos žodį, todėl tokių atvejų gali būti nemažai. |
 | 2 | Neigimas | Žymė tinka, bet emocija tekste paneigta („i dont feel …“, „not …“, „never …“), ir modelis klysta dėl to. |
 | 3 | Sarkazmas ar ironija | Žymė tinka, bet tekstas sako viena, o reiškia priešingai. |
 | 0 | Nė viena | Žymė tinka, neigimo ir sarkazmo nėra. |
@@ -37,6 +37,7 @@ Tikslas – įvertinti, kiek likusių klaidų yra ne modelių kaltė (klaidinga 
 |---|---|---|---|---|
 | i feel so lucky to have such great friends around me | baimė | džiaugsmas | 1 | aiškiai džiaugsmas – žymė klaidinga |
 | i feel so blessed to have you in my life | džiaugsmas | meilė | 1 | tinka abi vienodai – dviprasmiška |
+| i feel like i should go to the store before it closes | baimė | džiaugsmas | 1 | netinka nė viena iš 6 emocijų – aiškios emocijos nėra |
 | i dont feel happy anymore since she left | liūdesys | džiaugsmas | 2 | žymė tinka, modelį suklaidino paneigtas „happy“ |
 | oh great i feel so thrilled to be stuck in traffic again | pyktis | džiaugsmas | 3 | žymė tinka, „thrilled“ ironiškas |
 | i feel like crying every time i hear that song | liūdesys | baimė | 0 | žymė tinka, nėra nei neigimo, nei ironijos |

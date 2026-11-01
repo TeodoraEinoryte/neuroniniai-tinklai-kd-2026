@@ -1,6 +1,7 @@
-"""Comparison tables and figures for report 4.2–4.7 and appendices 1–3 and 7 (PLAN.md, section 6; step 4.1).
+"""Comparison tables and figures for report 3.5.11, 4.2–4.7 and appendices 1–3 and 7 (PLAN.md, section 6; step 4.1).
 
-Run: python compare.py [S9] [T0] [S1] [S8] [S2] [S3] [S10] [S11] [S7] [S12] [S4] [S5] [S47]   (no argument = all)
+Run: python compare.py [M] [S9] [T0] [S1] [S8] [S2] [S3] [S10] [S11] [S7] [S12] [S4] [S5] [S47]   (no argument = all)
+    M    the 10 models: layers, output shapes and parameter counts, report 3.5.11
     S9   optimisers: the S9a heatmap (optimiser × learning rate) and the S9 table, report 4.2
     T0   tuning: chosen size, optimiser and rate per model (report 4.3), full T0a / T0b tables and budget (appendix 1)
     S1   main comparison with DistilBERT (S14) and the two baselines, McNemar, report 4.4; per-class F1 (appendix 7)
@@ -28,6 +29,7 @@ import sys
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from keras.layers import Embedding
 
 import config
 import evaluation
@@ -36,6 +38,7 @@ from data import encode, keyword_groups, load_carer_extra, load_emotion
 from data_analysis import keyword_rule
 from generalization import (FIGURES_DIR, GROUPS_LT, TABLES_DIR, comma_axis, interval, load_saved, mean_sd, runs,
                             save)
+from train import MODELS as BUILDERS
 
 RESULTS = pd.read_csv(os.path.join(config.RESULTS_DIR, "results.csv"))
 MODELS = [m for m in config.MODEL_NAMES_LT if m not in ("distilbert", "distilbert_multi")]   # our 10, in order
@@ -126,6 +129,45 @@ def diff_columns(row, test):
 
 def macro_f1s(y, preds):
     return [evaluation.metrics(y, p, len(config.CLASSES_EN))["macro_f1"] for p in preds]
+
+
+# ---------- M: the models (report 3.5.11) ----------
+
+LAYERS_LT = {"Embedding": "Embedding", "PositionEmbedding": "pozicijos", "MultiHeadAttention": "savarankiškas dėmesys",
+             "GlobalAveragePooling1D": "vidurkis", "GlobalMaxPooling1D": "maksimumas", "AttentionPooling": "dėmesys",
+             "Dense": "Dense", "Conv1D": "Conv1D", "SimpleRNN": "SimpleRNN", "LSTM": "LSTM", "GRU": "GRU"}
+SKIPPED_LAYERS = ["InputLayer", "Dropout", "LayerNormalization"]   # keep the shape; the report says so under the table
+
+
+def spaced(n):
+    return f"{n:,}".replace(",", " ")
+
+
+def models():
+    """Our 10 models as S1 trains them (T0 size, the mask setting does not change the counts), before training: the
+    layers with the output shape of one text, e.g. "Conv1D (46×128)", and the parameters with and without the word
+    vectors (the Embedding layer). Should match the parameter columns of s8_cost.csv, which come from timing.py."""
+    table = {}
+    for model in MODELS:
+        build, input_type, _ = BUILDERS[model]
+        net = build(size=config.MODEL_SIZES[model]) if model in config.MODEL_SIZES else build()
+        layers = [f"multi-hot ({spaced(config.VOCAB_SIZE)})" if input_type == "multi_hot"
+                  else f"indeksai ({config.SEQUENCE_LENGTH})"]
+        for layer in net.layers:
+            kind = type(layer).__name__
+            if kind in SKIPPED_LAYERS:
+                continue
+            name = "Bi" + type(layer.forward_layer).__name__ if kind == "Bidirectional" else LAYERS_LT[kind]
+            output = layer.output[0] if isinstance(layer.output, list) else layer.output   # attention: [c, a]
+            layers.append(f"{name} ({'×'.join(str(n) for n in output.shape[1:])})")
+        words = sum(layer.count_params() for layer in net.layers if isinstance(layer, Embedding))
+        table[config.MODEL_NAMES_LT[model]] = {"sluoksniai (vieno teksto išėjimo forma)": " → ".join(layers),
+                                               "parametrų": spaced(net.count_params()),
+                                               "iš jų žodžių vektoriai": spaced(words),
+                                               "be žodžių vektorių": spaced(net.count_params() - words)}
+    table = pd.DataFrame(table).T
+    print(table.to_string())
+    save(table, "models.csv", "modelis (T0 parinktas dydis)")
 
 
 # ---------- S9: optimisers (report 4.2) ----------
@@ -979,7 +1021,7 @@ def s47():
     save(table, "s47_summary.csv", "tyrimas (makro F-matas išplėstinėje imtyje; geriausias pagal parinkimo imtį)")
 
 
-PARTS = {"S9": s9, "T0": t0, "S1": s1, "S8": s8, "S2": s2, "S3": s3, "S10": s10, "S11": s11, "S7": s7, "S12": s12,
+PARTS = {"M": models, "S9": s9, "T0": t0, "S1": s1, "S8": s8, "S2": s2, "S3": s3, "S10": s10, "S11": s11, "S7": s7, "S12": s12,
          "S4": s4, "S5": s5, "S47": s47}
 
 if __name__ == "__main__":

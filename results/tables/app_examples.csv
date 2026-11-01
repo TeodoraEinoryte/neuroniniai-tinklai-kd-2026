@@ -1,0 +1,13 @@
+sakinys,modelis,prognozė,antra,daugiausia dėmesio,"nežinomų žodžių, %"
+I feel so alone tonight,BiLSTM + dėmesys (anglų k.),"liūdesys 98,6 %","baimė 1,3 %","alone (1,00)",0
+i feel like i have finally found my place in this world,BiLSTM + dėmesys (anglų k.),"džiaugsmas 81,4 %","liūdesys 9,3 %","world (0,36)",0
+I feel so loved and cared for by my family,BiLSTM + dėmesys (anglų k.),"meilė 98,2 %","liūdesys 1,3 %","loved (1,00)",0
+I feel so annoyed when people ignore my messages,BiLSTM + dėmesys (anglų k.),"pyktis 99,7 %","baimė 0,3 %","annoyed (1,00)",0
+I am terrified of what tomorrow will bring,BiLSTM + dėmesys (anglų k.),"baimė 100,0 %","nuostaba 0,0 %","terrified (1,00)",0
+I feel amazed by how quickly this year went by,BiLSTM + dėmesys (anglų k.),"nuostaba 99,7 %","baimė 0,1 %","amazed (1,00)",0
+"I didn't feel humiliated at all, I was proud!",BiLSTM + dėmesys (anglų k.),"liūdesys 99,9 %","baimė 0,1 %","humiliated (1,00)",0
+"Wow, I never expected that!",BiLSTM + dėmesys (anglų k.),"džiaugsmas 62,6 %","baimė 16,0 %","wow (0,47)",0
+Šiandien jaučiuosi labai vieniša ir liūdna,BiLSTM + dėmesys (anglų k.),"baimė 98,6 %","pyktis 1,2 %","šiandien (0,53)",100
+Šiandien jaučiuosi labai vieniša ir liūdna,Conv1D (lietuvių k.),"liūdesys 95,0 %","džiaugsmas 2,1 %",–,0
+"Jaučiuosi labai laiminga, kad tave sutikau",Conv1D (lietuvių k.),"džiaugsmas 98,9 %","meilė 1,0 %",–,0
+Visai nesijaučiau pažeminta,Conv1D (lietuvių k.),"liūdesys 100,0 %","pyktis 0,0 %",–,0

@@ -4,3 +4,8 @@ S10 reguliarizacija,GRU,"L2 0,0001","0,903 ± 0,003","0,903 ± 0,001","-0,000 [-
 S11 gylis,Conv1D,2 sluoksniai,"0,896 ± 0,002","0,877 ± 0,011","-0,019 [-0,021; -0,017]","< 0,002",blogesnis
 S11 gylis,LSTM,2 sluoksniai,"0,900 ± 0,003","0,896 ± 0,004","-0,004 [-0,006; -0,002]","< 0,002","praktiškai lygus, nors reikšmingai blogesnis"
 S11 gylis,GRU,2 sluoksniai,"0,903 ± 0,003","0,900 ± 0,003","-0,003 [-0,005; -0,002]","< 0,002","praktiškai lygus, nors reikšmingai blogesnis"
+S12 žodžių vektoriai,Conv1D,"išmokti, 100-mačiai","0,896 ± 0,002","0,894 ± 0,002","-0,002 [-0,003; -0,001]","< 0,002","praktiškai lygus, nors reikšmingai blogesnis"
+S12 žodžių vektoriai,GRU,"GloVe, derinami","0,903 ± 0,003","0,907 ± 0,005","0,004 [0,003; 0,005]","< 0,002","praktiškai lygus, nors reikšmingai geresnis"
+S5 dvi klasės,Logistinė regresija,mokyta 2 klasėms (S1 sutrauktas į 2 klases),"0,957 ± 0,001","0,960 ± 0,000","0,002 [0,001; 0,003]","< 0,002","praktiškai lygus, nors reikšmingai geresnis"
+S5 dvi klasės,Conv1D,mokyta 2 klasėms (S1 sutrauktas į 2 klases),"0,977 ± 0,001","0,976 ± 0,000","-0,001 [-0,002; -0,000]","0,006","praktiškai lygus, nors reikšmingai blogesnis"
+S5 dvi klasės,GRU,mokyta 2 klasėms (S1 sutrauktas į 2 klases),"0,982 ± 0,001","0,980 ± 0,001","-0,003 [-0,003; -0,002]","< 0,002","praktiškai lygus, nors reikšmingai blogesnis"

@@ -1,0 +1,11 @@
+modelis (2 klasės: teigiama / neigiama; 5 sėklos),"sutraukta: testavimo bendras tikslumas, %","sutraukta: išplėstinė imtis, makro F-matas","6 klasių klaidos toje pačioje pusėje, %","mokyta 2 klasėms: testavimo bendras tikslumas, %","mokyta 2 klasėms: išplėstinė imtis, makro F-matas",mokyta − sutraukta [95 % PI],išvada
+Logistinė regresija,"96,5 ± 0,1","0,957 ± 0,001","69,0 ± 0,9","96,5 ± 0,1","0,960 ± 0,000","0,002 [0,001; 0,003]","praktiškai lygus, nors reikšmingai geresnis"
+MLP,"96,5 ± 0,1","0,958 ± 0,000","68,1 ± 1,1",–,–,–,–
+Embedding,"95,0 ± 0,4","0,945 ± 0,002","61,7 ± 2,5",–,–,–,–
+Conv1D,"97,8 ± 0,2","0,977 ± 0,001","72,3 ± 3,0","98,1 ± 0,2","0,976 ± 0,000","-0,001 [-0,002; -0,000]","praktiškai lygus, nors reikšmingai blogesnis"
+Transformeris,"96,9 ± 0,3","0,965 ± 0,001","68,5 ± 2,5",–,–,–,–
+SimpleRNN,"93,1 ± 1,0","0,923 ± 0,012","61,3 ± 4,4",–,–,–,–
+LSTM,"97,6 ± 0,3","0,978 ± 0,002","68,9 ± 3,1",–,–,–,–
+GRU,"98,2 ± 0,2","0,982 ± 0,001","73,7 ± 1,9","98,1 ± 0,3","0,980 ± 0,001","-0,003 [-0,003; -0,002]","praktiškai lygus, nors reikšmingai blogesnis"
+BiLSTM,"97,7 ± 0,1","0,978 ± 0,001","70,3 ± 1,8",–,–,–,–
+BiLSTM + dėmesys,"98,1 ± 0,4","0,980 ± 0,002","73,9 ± 4,1",–,–,–,–

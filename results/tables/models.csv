@@ -1,0 +1,11 @@
+modelis (T0 parinktas dydis),sluoksniai (vieno teksto išėjimo forma),parametrų,iš jų žodžių vektoriai,be žodžių vektorių
+Logistinė regresija,multi-hot (10 000) → Dense (6),60 006,0,60 006
+MLP,multi-hot (10 000) → Dense (64) → Dense (6),640 454,0,640 454
+Embedding,indeksai (50) → Embedding (50×64) → vidurkis (64) → Dense (64) → Dense (6),644 550,640 000,4 550
+Conv1D,indeksai (50) → Embedding (50×64) → Conv1D (46×128) → maksimumas (128) → Dense (6),681 862,640 000,41 862
+Transformeris,indeksai (50) → Embedding (50×64) → pozicijos (50×64) → savarankiškas dėmesys (50×64) → Dense (50×128) → Dense (50×64) → vidurkis (64) → Dense (6),677 062,640 000,37 062
+SimpleRNN,indeksai (50) → Embedding (50×64) → SimpleRNN (64) → Dense (6),648 646,640 000,8 646
+LSTM,indeksai (50) → Embedding (50×64) → LSTM (128) → Dense (6),739 590,640 000,99 590
+GRU,indeksai (50) → Embedding (50×64) → GRU (128) → Dense (6),715 270,640 000,75 270
+BiLSTM,indeksai (50) → Embedding (50×64) → BiLSTM (512) → Dense (6),1 300 486,640 000,660 486
+BiLSTM + dėmesys,indeksai (50) → Embedding (50×64) → BiLSTM (50×128) → dėmesys (128) → Dense (6),723 462,640 000,83 462

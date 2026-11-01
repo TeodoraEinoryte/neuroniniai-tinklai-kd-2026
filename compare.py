@@ -664,7 +664,11 @@ def audit_results(sample):
     table.loc["Cohen κ"] = [number(kappa, 2), "", ""]
     by_group = pd.crosstab(pd.Series([HUMAN_LT[c] for c in a[agreed]], name="žmogaus sprendimas (sutarti tekstai)"),
                            pd.Series(sample["raktinio žodžio grupė"].to_numpy()[agreed], name="raktinio žodžio grupė"))
-    return table, by_group.reindex([c for c in HUMAN_LT if c in by_group.index])
+    # where we disagreed: A's code (rows) against B's code (columns); the diagonal is the agreement
+    codes = [f"{i} – {name}" for i, name in enumerate(HUMAN_LT)]
+    agreement = pd.crosstab(pd.Categorical([codes[c] for c in a], categories=codes),
+                            pd.Categorical([codes[c] for c in b], categories=codes), dropna=False)
+    return table, by_group.reindex([c for c in HUMAN_LT if c in by_group.index]), agreement
 
 
 def attention_cases(x, y, p, groups):
@@ -713,8 +717,11 @@ def s7():
 
     # confusion matrices of the reference model and DistilBERT, % of each true class
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.6), constrained_layout=True)
+    confusion = {}
     for ax, (name, preds) in zip(axes, [("GRU", seed_runs["GRU"])] + list(distilbert.items())):
         shares = confusion_shares(y, preds)
+        for i, true in enumerate(config.CLASSES_LT):
+            confusion[f"{name}: {true}"] = [number(v, 1) for v in shares[i]]
         ax.imshow(shares, cmap="Blues", vmin=0, vmax=100)
         for i, j in np.ndindex(shares.shape):
             ax.text(j, i, number(shares[i, j], 1), ha="center", va="center", fontsize=8,
@@ -728,6 +735,8 @@ def s7():
     fig.savefig(path, dpi=120)
     plt.close(fig)
     print("Išsaugota:", path)
+    save(pd.DataFrame(confusion, index=config.CLASSES_LT).T, "s7_confusion.csv",
+         "modelis: tikroji klasė (prognozuota klasė, % tikrosios klasės tekstų išplėstinėje imtyje)")
 
     # most-confused pairs: share of all errors that go from one true class to one predicted class
     def error_shares(preds):
@@ -752,11 +761,13 @@ def s7():
     if results is None:
         print("Auditas: lauki abiejų žymėjimų (results/audit/audit_A.csv ir audit_B.csv, žr. README.md)")
     else:
-        table, by_group = results
+        table, by_group, agreement = results
         print(table.to_string())
         save(table, "s7_audit.csv", f"klaidos kategorija ({AUDIT_SIZE} sunkiausių tekstų)")
         print(by_group.to_string())
         save(by_group, "s7_audit_groups.csv", "žmogaus sprendimas (sutarti tekstai) pagal raktinio žodžio grupę")
+        print(agreement.to_string())
+        save(agreement, "s7_audit_agreement.csv", "A kodas (eilutės) ir B kodas (stulpeliai), tekstų")
 
     # attention heatmaps: BiLSTM + attention, seed 1, one text of each kind
     variant = rows("S1", "bilstm_attention")["variant"].iloc[0]

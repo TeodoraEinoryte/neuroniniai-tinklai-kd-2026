@@ -96,6 +96,19 @@ def holm(p_values, alpha=0.05):
     return significant
 
 
+def cohen_kappa(a, b, n_categories):
+    """Cohen's kappa: how much two labellers agree beyond chance (S7 error audit; Cohen, 1960).
+
+    p_o = share of items both put in the same category; p_e = agreement expected by chance = sum over the
+    categories of (share of A's labels in it) x (share of B's labels in it). kappa = (p_o - p_e) / (1 - p_e):
+    1 = full agreement, 0 = no more than chance.
+    """
+    m = confusion_matrix(a, b, n_categories) / len(a)   # rows = A's category, columns = B's
+    p_o = np.trace(m)
+    p_e = np.sum(m.sum(axis=1) * m.sum(axis=0))
+    return (p_o - p_e) / (1 - p_e)
+
+
 def plot_learning_curves(history, best, title, path):
     """Accuracy and loss per epoch for train and validation; history = keras History.history,
     best = the epoch EarlyStopping went back to (marked with a dashed line). NaN epochs are not drawn."""
@@ -199,6 +212,14 @@ if __name__ == "__main__":
     assert bootstrap_diff(y, [y], [(y + 1) % 3], "accuracy", 3) == (1.0, 1.0, 1.0, 0.0)
     # two seeds per model: the score is the mean over the seeds, (0.6 + 0.9) / 2 - 0.9 = -0.15
     assert np.isclose(bootstrap_diff(y, [p1, p2], [p2, p2], "accuracy", 3)[0], -0.15)
+
+    # Cohen's kappa by hand, y and p1 as two labellers' categories: they agree on 6 of 10, p_o = 0.6.
+    # Shares: y = [0.4, 0.3, 0.3], p1 = [0.3, 0.4, 0.3] -> p_e = 0.12 + 0.12 + 0.09 = 0.33,
+    # kappa = (0.6 - 0.33) / (1 - 0.33) = 27/67
+    kappa = cohen_kappa(y, p1, 3)
+    print(f"Cohen kappa: {kappa:.4f}")
+    assert np.isclose(kappa, 27 / 67)
+    assert np.isclose(cohen_kappa(y, y, 3), 1.0)            # the same labels: full agreement
 
     # Cross-check with Keras (library used only for checking, as for the labs)
     import keras

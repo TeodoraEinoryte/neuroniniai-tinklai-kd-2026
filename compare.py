@@ -1,6 +1,6 @@
 """Comparison tables and figures for report 4.2–4.7 and appendices 1–3 and 7 (PLAN.md, section 6; step 4.1).
 
-Run: python compare.py [S9] [T0] [S1] [S8] [S2] [S3] [S10] [S11] [S12] [S4] [S5] [S47]   (no argument = all)
+Run: python compare.py [S9] [T0] [S1] [S8] [S2] [S3] [S10] [S11] [S7] [S12] [S4] [S5] [S47]   (no argument = all)
     S9   optimisers: the S9a heatmap (optimiser × learning rate) and the S9 table, report 4.2
     T0   tuning: chosen size, optimiser and rate per model (report 4.3), full T0a / T0b tables and budget (appendix 1)
     S1   main comparison with DistilBERT (S14) and the two baselines, McNemar, report 4.4; per-class F1 (appendix 7)
@@ -8,6 +8,8 @@ Run: python compare.py [S9] [T0] [S1] [S8] [S2] [S3] [S10] [S11] [S12] [S4] [S5]
     S2   padding and the padding mask, accuracy by text length, the Transformer's mask arms, report 4.5
     S3   class weights and focal loss, per class, report 4.6
     S10  regularisation (appendix 2); S11 depth (appendix 3)
+    S7   errors: confusion matrices, most-confused pairs, the error audit (results/audit/), attention heatmaps,
+         report 4.10
     S12  word vectors, GloVe (appendix 4); S4 train-set size with the keyword-rule curve (appendix 5);
     S5   two classes: S1 collapsed and the binary models (appendix 6)                    (S12, S4, S5: A)
     S47  the 4.7 summary: each side study's best setting against S1
@@ -20,6 +22,7 @@ Statistics (PLAN.md section 6): a difference between two models is a paired boot
 table; McNemar per seed on the official test. The wording rule is in verdict().
 """
 import os
+import re
 import sys
 
 import matplotlib.pyplot as plt
@@ -28,9 +31,11 @@ import pandas as pd
 
 import config
 import evaluation
-from data import keyword_groups, load_carer_extra, load_emotion
+import models_b
+from data import encode, keyword_groups, load_carer_extra, load_emotion
 from data_analysis import keyword_rule
-from generalization import FIGURES_DIR, TABLES_DIR, comma_axis, interval, mean_sd, runs, save
+from generalization import (FIGURES_DIR, GROUPS_LT, TABLES_DIR, comma_axis, interval, load_saved, mean_sd, runs,
+                            save)
 
 RESULTS = pd.read_csv(os.path.join(config.RESULTS_DIR, "results.csv"))
 MODELS = [m for m in config.MODEL_NAMES_LT if m not in ("distilbert", "distilbert_multi")]   # our 10, in order
@@ -572,6 +577,196 @@ def s11():
     save(table, "s11_depth.csv", "modelis: sluoksnių (makro F-matas; 5 sėklos)")
 
 
+# ---------- S7: errors (report 4.10) ----------
+
+AUDIT_DIR = os.path.join(config.RESULTS_DIR, "audit")
+AUDIT_SIZE = 100
+AUDIT_SHARE = 0.8              # a text counts as hard if at least 80 % of the S1 runs get it wrong (PLAN.md S7)
+AUDIT_SEED = 2026
+# Error categories (results/audit/README.md). We label only what needs a person, codes 0–3; for code 0 the
+# category follows from the text's keyword group (data.keyword_groups), the same groups as in S13 and report 4.8
+HUMAN_LT = ["nė viena", "žymė klaidinga arba dviprasmiška", "neigimas", "sarkazmas ar ironija"]
+AUTO_LT = {"none": "nėra emocijos žodžio", "ambiguous": "daugiareikšmis emocijos žodis",
+           "unseen": "mokymo imtyje nematytas emocijos žodis", "pure": "tikra modelio klaida"}
+CATEGORIES_LT = HUMAN_LT[1:] + list(AUTO_LT.values())   # the final categories, in the guide's order
+CATEGORY_COLUMN = "kategorija (0–3)"
+JOY, LOVE = config.CLASSES_EN.index("joy"), config.CLASSES_EN.index("love")
+
+
+def confusion_shares(y, preds):
+    """Row-normalised confusion matrix (% of each true class), summed over the seeds."""
+    m = sum(evaluation.confusion_matrix(y, p, len(config.CLASSES_EN)) for p in preds)
+    return m / m.sum(axis=1, keepdims=True) * 100
+
+
+def audit_sample(x, y, all_runs, groups):
+    """The audit sample (PLAN.md S7): of the extended-test texts that at least 80 % of the S1 runs get wrong, a
+    random 100 (fixed seed). The official test has only 33 such texts, so the extended test is used. Written once;
+    later runs read it back, so the labels in audit_A.csv / audit_B.csv always belong to the same texts."""
+    path = os.path.join(AUDIT_DIR, "audit_sample.csv")
+    if os.path.exists(path):
+        return pd.read_csv(path, sep=";", encoding="utf-8-sig")
+    wrong = np.mean([p != y for p in all_runs], axis=0)
+    pool = np.where(wrong >= AUDIT_SHARE)[0]
+    chosen = np.sort(np.random.default_rng(AUDIT_SEED).choice(pool, AUDIT_SIZE, replace=False))
+    sample = pd.DataFrame({
+        "nr": range(1, AUDIT_SIZE + 1), "indeksas išplėstinėje imtyje": chosen, "tekstas": x[chosen],
+        "tikroji klasė (žymė)": [config.CLASSES_LT[y[k]] for k in chosen],
+        "dažniausia klaidinga prognozė": [config.CLASSES_LT[np.bincount([p[k] for p in all_runs if p[k] != y[k]]).argmax()]
+                                          for k in chosen],
+        "klaidingų paleidimų dalis, %": [round(wrong[k] * 100) for k in chosen],
+        "raktinio žodžio grupė": [GROUPS_LT[g] for g in groups[chosen]]})
+    os.makedirs(AUDIT_DIR, exist_ok=True)
+    sample.to_csv(path, sep=";", index=False, encoding="utf-8-sig")
+    print(f"Išsaugota: {path} ({len(pool)} sunkių tekstų, atrinkta {AUDIT_SIZE})")
+    return sample
+
+
+def audit_sheets(sample):
+    """One labelling sheet each (A, B): text, gold label and the most common wrong prediction only. Written only if
+    missing, so a sheet that is being labelled is never overwritten."""
+    for who in ["A", "B"]:
+        path = os.path.join(AUDIT_DIR, f"audit_{who}.csv")
+        if not os.path.exists(path):
+            sheet = sample[["nr", "tekstas", "tikroji klasė (žymė)", "dažniausia klaidinga prognozė"]].copy()
+            sheet[CATEGORY_COLUMN], sheet["pastaba"] = "", ""
+            sheet.to_csv(path, sep=";", index=False, encoding="utf-8-sig")
+            print("Išsaugota:", path)
+
+
+def audit_results(sample):
+    """The audit once both have labelled all 100 texts (None before that). Final category of a text: the person's
+    code 1–3 if given, otherwise the one its keyword group implies (code 0). Our agreement is measured on the codes
+    0–3, the only part a person decides: the share of texts with the same code and Cohen's kappa (kappa alone can
+    be low when nearly all texts get one code, so both are reported). Excel may save with "," or ";", so the
+    separator is detected."""
+    codes = {}
+    for who in ["A", "B"]:
+        sheet = pd.read_csv(os.path.join(AUDIT_DIR, f"audit_{who}.csv"), sep=None, engine="python", encoding="utf-8-sig")
+        codes[who] = pd.to_numeric(sheet[CATEGORY_COLUMN], errors="coerce").to_numpy()
+        print(f"{who} sužymėjo {np.isin(codes[who], range(len(HUMAN_LT))).sum()} iš {len(sheet)} tekstų")
+    if not all(np.isin(c, range(len(HUMAN_LT))).all() for c in codes.values()):
+        return None
+    group_of = {lt: g for g, lt in GROUPS_LT.items()}
+    groups = [group_of[g] for g in sample["raktinio žodžio grupė"]]
+    a, b = codes["A"].astype(int), codes["B"].astype(int)
+    final = {who: np.array([HUMAN_LT[c] if c else AUTO_LT[g] for c, g in zip(c_who, groups)])
+             for who, c_who in [("A", a), ("B", b)]}
+    agreed = a == b                                # same code, so the same final category too
+    table = pd.DataFrame({"A, tekstų": [int(np.sum(final["A"] == c)) for c in CATEGORIES_LT],
+                          "B, tekstų": [int(np.sum(final["B"] == c)) for c in CATEGORIES_LT],
+                          "abu vienodai, tekstų": [int(np.sum(agreed & (final["A"] == c))) for c in CATEGORIES_LT]},
+                         index=CATEGORIES_LT)
+    kappa = evaluation.cohen_kappa(a, b, len(HUMAN_LT))
+    print(f"Sutapo {agreed.sum()} iš {len(a)}; Cohen kappa {number(kappa, 2)}")
+    table.loc["sutapimas (žmogaus sprendimas, kodai 0–3)"] = [f"{agreed.sum()} iš {len(a)}", "", ""]
+    table.loc["Cohen κ"] = [number(kappa, 2), "", ""]
+    by_group = pd.crosstab(pd.Series([HUMAN_LT[c] for c in a[agreed]], name="žmogaus sprendimas (sutarti tekstai)"),
+                           pd.Series(sample["raktinio žodžio grupė"].to_numpy()[agreed], name="raktinio žodžio grupė"))
+    return table, by_group.reindex([c for c in HUMAN_LT if c in by_group.index])
+
+
+def attention_cases(x, y, p, groups):
+    """Typical cases for the attention figure, one random text (fixed seed, at most 14 words) from each
+    predefined kind, so the examples are not picked by hand."""
+    rng = np.random.default_rng(AUDIT_SEED)
+    short = np.array([len(t.split()) <= 14 for t in x])
+    negated = np.array([re.search(r"\b(dont|didnt|not|never) (\w+ )?feel", t) is not None for t in x])
+    kinds = {"teisingai, vienareikšmis žodis": (p == y) & (groups == "pure"),
+             "teisingai, be emocijos žodžio": (p == y) & (groups == "none"),
+             "klaida, daugiareikšmis žodis": (p != y) & (groups == "ambiguous"),
+             "klaida, be emocijos žodžio": (p != y) & (groups == "none"),
+             "džiaugsmas → meilė": (y == JOY) & (p == LOVE),
+             "neigimas": negated}
+    return {kind: rng.choice(np.where(mask & short)[0]) for kind, mask in kinds.items()}
+
+
+def plot_attention(cases, x, y, p, weights, path):
+    """Each case as a row of words shaded by the attention weight a_t (darker = more attention)."""
+    fig, ax = plt.subplots(figsize=(11, 0.75 * len(cases) + 0.4))
+    ax.set_axis_off()
+    for row, (kind, k) in enumerate(cases.items()):
+        top = len(cases) - row
+        ax.text(0, top + 0.28, f"{kind}: tikroji klasė „{config.CLASSES_LT[y[k]]}“, prognozė „{config.CLASSES_LT[p[k]]}“",
+                fontsize=8, color="dimgray")
+        position = 0
+        for j, word in enumerate(x[k].split()[:config.SEQUENCE_LENGTH]):
+            ax.text(position, top, word, fontsize=10, family="monospace", va="center",
+                    color="white" if weights[k][j] > 0.5 else "black",
+                    bbox={"facecolor": plt.cm.Reds(weights[k][j]), "edgecolor": "none", "pad": 1.5})
+            position += len(word) + 1.5
+    ax.set_xlim(0, 105)
+    ax.set_ylim(0.5, len(cases) + 0.6)
+    fig.savefig(path, dpi=120, bbox_inches="tight")
+    plt.close(fig)
+    print("Išsaugota:", path)
+
+
+def s7():
+    d = load_emotion()
+    x, y = load_carer_extra("xtest")
+    assert (y == y_xtest()).all()
+    groups = keyword_groups(x, d["x_train"], d["y_train"])
+    seed_runs = {config.MODEL_NAMES_LT[m]: [z["p_xtest"] for _, z in r] for (m, _), r in runs("S1").items()}
+    distilbert = {config.MODEL_NAMES_LT[m]: [z["p_xtest"] for _, z in r] for (m, _), r in runs("S14").items()}
+
+    # confusion matrices of the reference model and DistilBERT, % of each true class
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.6), constrained_layout=True)
+    for ax, (name, preds) in zip(axes, [("GRU", seed_runs["GRU"])] + list(distilbert.items())):
+        shares = confusion_shares(y, preds)
+        ax.imshow(shares, cmap="Blues", vmin=0, vmax=100)
+        for i, j in np.ndindex(shares.shape):
+            ax.text(j, i, number(shares[i, j], 1), ha="center", va="center", fontsize=8,
+                    color="white" if shares[i, j] > 60 else "black")
+        ax.set_xticks(range(len(config.CLASSES_LT)), config.CLASSES_LT, rotation=30, ha="right")
+        ax.set_yticks(range(len(config.CLASSES_LT)), config.CLASSES_LT)
+        ax.set_xlabel("Prognozuota klasė")
+        ax.set_ylabel("Tikroji klasė")
+        ax.set_title(f"{name} ({len(preds)} sėklos, % tikrosios klasės)")
+    path = os.path.join(FIGURES_DIR, "s7_confusion.png")
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+    print("Išsaugota:", path)
+
+    # most-confused pairs: share of all errors that go from one true class to one predicted class
+    def error_shares(preds):
+        m = sum(evaluation.confusion_matrix(y, p, len(config.CLASSES_EN)) for p in preds).astype(float)
+        np.fill_diagonal(m, 0)
+        return m / m.sum() * 100
+
+    rule = keyword_rule(d["x_train"], d["y_train"])(x)
+    columns = {"10 modelių vidurkis": np.mean([error_shares(p) for p in seed_runs.values()], axis=0),
+               "GRU": error_shares(seed_runs["GRU"]), **{n: error_shares(p) for n, p in distilbert.items()},
+               "Raktinio žodžio taisyklė": error_shares([rule])}
+    order = np.dstack(np.unravel_index(np.argsort(-columns["10 modelių vidurkis"], axis=None), (6, 6)))[0][:8]
+    pairs = pd.DataFrame({c: [number(v[i, j], 1) for i, j in order] for c, v in columns.items()},
+                         index=[f"{config.CLASSES_LT[i]} → {config.CLASSES_LT[j]}" for i, j in order])
+    print(pairs.to_string())
+    save(pairs, "s7_confused_pairs.csv", "tikroji → prognozuota klasė (% visų klaidų išplėstinėje imtyje)")
+
+    # the audit: sample once, then the labels of both of us when they are in
+    sample = audit_sample(x, y, [p for preds in seed_runs.values() for p in preds], groups)
+    audit_sheets(sample)
+    results = audit_results(sample)
+    if results is None:
+        print("Auditas: lauki abiejų žymėjimų (results/audit/audit_A.csv ir audit_B.csv, žr. README.md)")
+    else:
+        table, by_group = results
+        print(table.to_string())
+        save(table, "s7_audit.csv", f"klaidos kategorija ({AUDIT_SIZE} sunkiausių tekstų)")
+        print(by_group.to_string())
+        save(by_group, "s7_audit_groups.csv", "žmogaus sprendimas (sutarti tekstai) pagal raktinio žodžio grupę")
+
+    # attention heatmaps: BiLSTM + attention, seed 1, one text of each kind
+    variant = rows("S1", "bilstm_attention")["variant"].iloc[0]
+    net, vectorizer = load_saved("S1", "bilstm_attention", variant, 1)
+    p = predictions("S1", "bilstm_attention", seeds=[1])[0]
+    cases = attention_cases(x, y, p, groups)
+    picked = np.array(list(cases.values()))
+    weights = dict(zip(picked, models_b.attention_weights(net, encode(vectorizer, x[picked], "sequence"))))
+    plot_attention(cases, x, y, p, weights, os.path.join(FIGURES_DIR, "s7_attention.png"))
+
+
 # ---------- S12, S4, S5: word vectors, train-set size, two classes (appendices 4–6; A) ----------
 
 S12_ARMS_LT = {"learned100": "išmokti, 100-mačiai", "glove-frozen": "GloVe, nekeičiami",
@@ -772,8 +967,8 @@ def s47():
     save(table, "s47_summary.csv", "tyrimas (makro F-matas išplėstinėje imtyje; geriausias pagal parinkimo imtį)")
 
 
-PARTS = {"S9": s9, "T0": t0, "S1": s1, "S8": s8, "S2": s2, "S3": s3, "S10": s10, "S11": s11, "S12": s12, "S4": s4,
-         "S5": s5, "S47": s47}
+PARTS = {"S9": s9, "T0": t0, "S1": s1, "S8": s8, "S2": s2, "S3": s3, "S10": s10, "S11": s11, "S7": s7, "S12": s12,
+         "S4": s4, "S5": s5, "S47": s47}
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")

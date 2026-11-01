@@ -1,9 +1,10 @@
 """Comparison tables and figures for report 4.2–4.7 and appendices 1–3 and 7 (PLAN.md, section 6; step 4.1).
 
-Run: python compare.py [S9] [T0] [S1] [S2] [S3] [S10] [S11] [S12] [S4] [S5] [S47]   (no argument = all)
+Run: python compare.py [S9] [T0] [S1] [S8] [S2] [S3] [S10] [S11] [S12] [S4] [S5] [S47]   (no argument = all)
     S9   optimisers: the S9a heatmap (optimiser × learning rate) and the S9 table, report 4.2
     T0   tuning: chosen size, optimiser and rate per model (report 4.3), full T0a / T0b tables and budget (appendix 1)
     S1   main comparison with DistilBERT (S14) and the two baselines, McNemar, report 4.4; per-class F1 (appendix 7)
+    S8   cost: parameters, training and prediction time against quality, report 4.4 (needs timing.py first)
     S2   padding and the padding mask, accuracy by text length, the Transformer's mask arms, report 4.5
     S3   class weights and focal loss, per class, report 4.6
     S10  regularisation (appendix 2); S11 depth (appendix 3)
@@ -335,6 +336,56 @@ def s1():
         per_class[name] = {c: mean_sd(f1[:, i]) for i, c in enumerate(columns)}
         per_class[name]["makro F-matas"] = mean_sd(f1.mean(axis=1))
     save(pd.DataFrame(per_class).T, "s1_per_class.csv", "modelis (F-matas išplėstinėje imtyje; klasės dalis mokymo imtyje)")
+
+
+# ---------- S8: cost (report 4.4) ----------
+
+LABEL_OFFSETS = {"GRU": (-26, 5), "LSTM": (4, -11), "BiLSTM + dėmesys": (4, 4), "MLP": (-26, 4)}   # close points
+
+def s8():
+    """Quality against cost: parameters (with and without the word embedding), training time and time per epoch
+    (medians over the seeds, from results.csv) and the time to classify 1,000 texts (timing.py, all models measured
+    on one machine). Training times come from where each study ran: S1 on B's machine, DistilBERT (S14) on A's."""
+    timing = pd.read_csv(os.path.join(config.RESULTS_DIR, "timing.csv")).set_index("model")
+    table, points = {}, {}
+    for study, models in [("S1", MODELS), ("S14", ["distilbert"])]:
+        for model in models:
+            r = rows(study, model)
+            if model not in timing.index or not len(r):
+                print(f"Praleista (nėra laiko matavimo ar paleidimų): {model}")
+                continue
+            t = timing.loc[model]
+            name = config.MODEL_NAMES_LT[model]
+            table[name] = {"parametrų": f"{t['params']:,}".replace(",", " "),
+                           "iš jų žodžių vektoriai": f"{t['embedding_params']:,}".replace(",", " "),
+                           "be žodžių vektorių": f"{t['params'] - t['embedding_params']:,}".replace(",", " "),
+                           "mokymo laikas, s (mediana)": number(r["train_time_s"].median(), 0),
+                           "s / epochą (mediana)": number((r["train_time_s"] / r["epochs"]).median(), 1),
+                           "prognozavimo laikas 1 000 tekstų, ms": number(t["ms_median"], 0),
+                           "išplėstinė imtis: makro F-matas": mean_sd(r["xtest_macro_f1"])}
+            points[name] = (r["train_time_s"].median(), t["ms_median"], r["xtest_macro_f1"].mean())
+    table = pd.DataFrame(table).T
+    print(table.to_string())
+    save(table, "s8_cost.csv", f"modelis (prognozavimo laikas: mediana iš 5, paketas {timing['batch'].iloc[0]}, "
+                               f"{timing['threads'].iloc[0]} gijos, vienas kompiuteris)")
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.2), sharey=True, constrained_layout=True)
+    for ax, i, label in [(axes[0], 0, "Mokymo laikas, s (log. skalė)"),
+                         (axes[1], 1, "Prognozavimo laikas 1 000 tekstų, ms (log. skalė)")]:
+        for name, p in points.items():
+            ax.scatter(p[i], p[2], color="tab:red" if name == "DistilBERT" else "tab:blue")
+            ax.annotate(name, (p[i], p[2]), textcoords="offset points", xytext=LABEL_OFFSETS.get(name, (4, 3)),
+                        fontsize=8)
+        ax.set_xscale("log")
+        comma_axis(ax.xaxis)                      # "10", "100" instead of 10¹, 10²
+        ax.set_xlabel(label)
+        ax.grid(alpha=0.3)
+    axes[0].set_ylabel("Makro F-matas išplėstinėje imtyje")
+    comma_axis(axes[0].yaxis)
+    path = os.path.join(FIGURES_DIR, "s8_quality_cost.png")
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+    print("Išsaugota:", path)
 
 
 # ---------- S2: padding and the padding mask (report 4.5) ----------
@@ -721,8 +772,8 @@ def s47():
     save(table, "s47_summary.csv", "tyrimas (makro F-matas išplėstinėje imtyje; geriausias pagal parinkimo imtį)")
 
 
-PARTS = {"S9": s9, "T0": t0, "S1": s1, "S2": s2, "S3": s3, "S10": s10, "S11": s11, "S12": s12, "S4": s4, "S5": s5,
-         "S47": s47}
+PARTS = {"S9": s9, "T0": t0, "S1": s1, "S8": s8, "S2": s2, "S3": s3, "S10": s10, "S11": s11, "S12": s12, "S4": s4,
+         "S5": s5, "S47": s47}
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")

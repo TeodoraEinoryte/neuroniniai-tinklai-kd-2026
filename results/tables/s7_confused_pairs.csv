@@ -1,0 +1,9 @@
+tikroji → prognozuota klasė (% visų klaidų išplėstinėje imtyje),10 modelių vidurkis,GRU,DistilBERT,Raktinio žodžio taisyklė
+meilė → džiaugsmas,"15,0","14,8","16,9","17,9"
+džiaugsmas → meilė,"14,1","20,0","19,3","1,9"
+pyktis → liūdesys,"7,0","7,7","7,3","2,2"
+nuostaba → baimė,"6,2","7,5","6,8","1,5"
+liūdesys → pyktis,"5,8","5,4","5,8","0,9"
+liūdesys → džiaugsmas,"5,4","2,8","2,8","32,3"
+pyktis → baimė,"4,8","7,2","3,2","1,3"
+liūdesys → baimė,"4,4","5,3","4,3","0,5"

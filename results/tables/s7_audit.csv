@@ -1,0 +1,10 @@
+klaidos kategorija (100 sunkiausių tekstų),"A, tekstų","B, tekstų","abu vienodai, tekstų"
+"žymė nepatikima (klaidinga, dviprasmiška arba aiškios emocijos nėra)",59,45,35
+neigimas,1,4,1
+sarkazmas ar ironija,1,1,0
+nėra emocijos žodžio,28,32,23
+daugiareikšmis emocijos žodis,6,12,2
+mokymo imtyje nematytas emocijos žodis,2,2,1
+tikra modelio klaida,3,4,2
+"sutapimas (žmogaus sprendimas, kodai 0–3)",64 iš 100,,
+Cohen κ,"0,33",,

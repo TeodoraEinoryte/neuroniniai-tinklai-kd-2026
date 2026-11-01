@@ -56,6 +56,23 @@ def runs(study):
     return found
 
 
+def saved_seeds(study, model, variant, seed_runs):
+    """The seeds of seed_runs whose saved model is on this machine (results/models/ is not in git: S1 seeds 6–8
+    were trained on B's machine). Prints the missing ones, so a table never leaves them out silently."""
+    present = [s for s, _ in seed_runs
+               if os.path.exists(os.path.join(MODELS_DIR, f"{study}_{model}_{variant}_seed{s}.keras"))]
+    missing = [s for s, _ in seed_runs if s not in present]
+    if missing:
+        print(f"Nėra išsaugoto modelio: {study} {model} sėklos {missing}; jos praleistos")
+    return present
+
+
+def five_seeds(seed_runs):
+    """Only seeds 1–5 (config.SEEDS): S1 has 3 more for its top group (config.S1_EXTRA_SEEDS), but the studies it
+    is compared with here (S12, S15, S17) have seeds 1–5, so both sides of a comparison get the same seeds."""
+    return [(s, z) for s, z in seed_runs if s in config.SEEDS]
+
+
 def load_saved(study, model, variant, seed):
     """A saved model (train.py saves the S1 and S15 ones) and its vectorizer, rebuilt from the saved vocabulary."""
     run_id = f"{study}_{model}_{variant}_seed{seed}"
@@ -201,7 +218,7 @@ def negation_table(d):
 
     for (model, variant), seed_runs in runs("S1").items():
         per_seed = []
-        for seed, _ in seed_runs:
+        for seed in saved_seeds("S1", model, variant, seed_runs):
             net, vectorizer = load_saved("S1", model, variant, seed)
             per_seed.append(scores(predict_texts(net, vectorizer, model, texts)))
             keras.backend.clear_session()
@@ -235,7 +252,7 @@ def attention_table(d, seed=0):
         return " ".join(words[k][:j] + words[k][j + 1:])
 
     per_seed = []
-    for run_seed, _ in seed_runs:
+    for run_seed in saved_seeds("S1", "bilstm_attention", variant, seed_runs):
         net, vectorizer = load_saved("S1", "bilstm_attention", variant, run_seed)
         x = encode(vectorizer, texts, "sequence")
         a = models_b.attention_weights(net, x)                                   # (n, 50); padding gets 0
@@ -312,7 +329,7 @@ def lithuanian_table():
             "išplėstinė imtis, lietuvių k.", "skirtumas LT − EN išplėstinėje imtyje [95 % PI]",
             "angliškas modelis su lietuviškais tekstais"]
     rows = {}
-    for (model, _), en in runs("S1").items():
+    for (model, _), en in ((k, five_seeds(r)) for k, r in runs("S1").items()):
         lt = first_runs("S15", model)
         y_x = en[0][1]["y_xtest"]
         assert (lt[0][1]["y_xtest"] == y_x).all()          # the same 50,000 texts, translated
@@ -349,7 +366,7 @@ def lithuanian_groups_table(d):
     y = d["y_test"]
     groups = keyword_groups(d["x_test"], d["x_train"], d["y_train"])
     rows = {}
-    for (model, _), en in runs("S1").items():
+    for (model, _), en in ((k, five_seeds(r)) for k, r in runs("S1").items()):
         lt = first_runs("S15", model)
         row = {}
         for g, name in GROUPS_LT.items():
@@ -398,7 +415,7 @@ def cross_corpus_table():
             "CARER → visi GoEmotions (6 535)"]
     rows = {}
     for (model, _), go in runs("S17").items():
-        carer = first_runs("S1", model)
+        carer = five_seeds(first_runs("S1", model))
         assert (carer[0][1]["y_go"][part] == y_go_test).all() and (go[0][1]["y_test"] == y_go_test).all()
         rows[config.MODEL_NAMES_LT[model]] = dict(zip(cols, [
             mean_sd([macro_f1(z["y_test"], z["p_test"]) for _, z in carer]),
@@ -440,7 +457,7 @@ def goemotions_per_class_table():
         rows[name] = {k: mean_sd([s[k] for s in per_seed], 1, 1 if k.endswith("%") else 3) for k in per_seed[0]}
 
     for study in ["S1", "S14"]:
-        for (model, _), seed_runs in runs(study).items():
+        for (model, _), seed_runs in ((k, five_seeds(r) if study == "S1" else r) for k, r in runs(study).items()):
             add(config.MODEL_NAMES_LT[model], [scores(z["p_go"]) for _, z in seed_runs])
     for (model, variant), seed_runs in runs("S12").items():
         embedding = variant.split("-", 1)[1]                 # "size128-glove-frozen" -> "glove-frozen"

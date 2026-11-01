@@ -1,12 +1,14 @@
 """Comparison tables and figures for report 4.2–4.7 and appendices 1–3 and 7 (PLAN.md, section 6; step 4.1).
 
-Run: python compare.py [S9] [T0] [S1] [S2] [S3] [S10] [S11] [S47]   (no argument = all)
+Run: python compare.py [S9] [T0] [S1] [S2] [S3] [S10] [S11] [S12] [S4] [S5] [S47]   (no argument = all)
     S9   optimisers: the S9a heatmap (optimiser × learning rate) and the S9 table, report 4.2
     T0   tuning: chosen size, optimiser and rate per model (report 4.3), full T0a / T0b tables and budget (appendix 1)
     S1   main comparison with DistilBERT (S14) and the two baselines, McNemar, report 4.4; per-class F1 (appendix 7)
     S2   padding and the padding mask, accuracy by text length, the Transformer's mask arms, report 4.5
     S3   class weights and focal loss, per class, report 4.6
     S10  regularisation (appendix 2); S11 depth (appendix 3)
+    S12  word vectors, GloVe (appendix 4); S4 train-set size with the keyword-rule curve (appendix 5);
+    S5   two classes: S1 collapsed and the binary models (appendix 6)                    (S12, S4, S5: A)
     S47  the 4.7 summary: each side study's best setting against S1
 Nothing is trained: everything comes from results.csv and the saved predictions. Tables go to results/tables/
 (Lithuanian headers, decimal comma, "mean ± sd" over the seeds), figures to results/figures/. All parts take ~8 min,
@@ -25,7 +27,7 @@ import pandas as pd
 
 import config
 import evaluation
-from data import load_carer_extra, load_emotion
+from data import keyword_groups, load_carer_extra, load_emotion
 from data_analysis import keyword_rule
 from generalization import FIGURES_DIR, TABLES_DIR, comma_axis, interval, mean_sd, runs, save
 
@@ -519,6 +521,169 @@ def s11():
     save(table, "s11_depth.csv", "modelis: sluoksnių (makro F-matas; 5 sėklos)")
 
 
+# ---------- S12, S4, S5: word vectors, train-set size, two classes (appendices 4–6; A) ----------
+
+S12_ARMS_LT = {"learned100": "išmokti, 100-mačiai", "glove-frozen": "GloVe, nekeičiami",
+               "glove-tuned": "GloVe, derinami", "glove-extended": "GloVe, nekeičiami, išplėstas žodynas"}
+S12_LT = "S12 žodžių vektoriai"
+S5_LT = "S5 dvi klasės"
+
+
+def f1s(y, preds, n_classes):
+    """macro_f1s() for any number of classes (S5 has 2)."""
+    return [evaluation.metrics(y, p, n_classes)["macro_f1"] for p in preds]
+
+
+def s12():
+    """S12, pretrained word vectors (appendix 4): every arm against S1 (learned 64-d vectors) on the extended test,
+    and the two places where pretrained vectors could help most: all 6,535 GoEmotions texts (another domain; 7.9 %
+    of its word occurrences are outside the train vocabulary), with its own paired bootstrap and Holm, and the
+    test texts whose emotion word never is one in train (keyword group "unseen", accuracy). Coverage of GloVe:
+    `python data_analysis.py glove`."""
+    def extra(r):
+        return {"geriausia epocha": number(r["best_epoch"].mean(), 1)}
+
+    table, _ = side_table("S12", SIDE_MODELS, S12_ARMS_LT, extra)
+    d = load_emotion()
+    unseen = keyword_groups(d["x_test"], d["x_train"], d["y_train"]) == "unseen"
+    y_go = runs("S1")[next(iter(runs("S1")))][0][1]["y_go"]
+    go, test = {}, {}                             # (model, arm label) -> one prediction array per seed
+    for m in SIDE_MODELS:
+        variant = rows("S1", m)["variant"].iloc[0]
+        go[(m, "S1")] = predictions("S1", m, key="p_go", seeds=config.SEEDS)
+        test[(m, "S1")] = predictions("S1", m, key="p_test", seeds=config.SEEDS)
+        for suffix, label in S12_ARMS_LT.items():
+            go[(m, label)] = predictions("S12", m, f"{variant}-{suffix}", key="p_go")
+            test[(m, label)] = predictions("S12", m, f"{variant}-{suffix}", key="p_test")
+    arms = [k for k in go if k[1] != "S1"]
+    tests = [evaluation.bootstrap_diff(y_go, go[k], go[(k[0], "S1")]) for k in arms]
+    significant = dict(zip(arms, evaluation.holm([t[3] for t in tests])))
+    tests = dict(zip(arms, tests))
+    columns = {"GoEmotions (6 535)": {}, "GoEmotions: skirtumas [95 % PI]": {}, "GoEmotions: išvada": {},
+               f"nematytas emocijos žodis (n = {unseen.sum()}), %": {}}
+    for (m, label) in go:
+        name = f"{config.MODEL_NAMES_LT[m]}: {label}"
+        values = [columns[c] for c in columns]
+        values[0][name] = mean_sd(macro_f1s(y_go, go[(m, label)]))
+        if label == "S1":
+            values[1][name], values[2][name] = "S1", "S1"
+        else:
+            diff, low, high, _ = tests[(m, label)]
+            values[1][name] = interval(diff, low, high)
+            values[2][name] = verdict(low, high, significant[(m, label)])
+        values[3][name] = mean_sd([(p[unseen] == d["y_test"][unseen]).mean() for p in test[(m, label)]], 100, 1)
+    for column, values in columns.items():
+        table[column] = pd.Series(values)
+    table = table.rename(index=lambda i: i.replace(": S1", ": S1 (išmokti, 64-mačiai)"))
+    print(table.to_string())
+    save(table, "s12_word_vectors.csv", "modelis: žodžių vektoriai (makro F-matas; 5 sėklos)")
+
+
+def _fraction(variant):
+    """Share of train in an S4 variant name: "size128-frac0.25" -> 0.25, "size128" -> 1.0."""
+    return float(variant.split("frac")[1]) if "frac" in variant else 1.0
+
+
+def s4():
+    """S4, train-set size (appendix 5): test macro-F1 of logreg, Conv1D and GRU trained on stratified subsets of
+    1k–16k train texts (the same subset for every model of one seed), and the keyword rule rebuilt from each subset.
+    S4 keeps no extended-test predictions (train.NO_XTEST_STUDIES), so it is read on the official test set."""
+    d = load_emotion()
+    s4_rows = rows("S4")
+    models = [m for m in MODELS if m in set(s4_rows["model"])]
+    fractions = sorted({_fraction(v) for v in s4_rows["variant"]})
+    table, curves = {}, {}
+    for f in fractions:
+        n = len(load_emotion(fraction=f, seed=1)["y_train"])
+        row = {}
+        for m in models:
+            r = s4_rows[(s4_rows["model"] == m) & (s4_rows["variant"].map(_fraction) == f)]
+            row[config.MODEL_NAMES_LT[m]] = mean_sd(r["test_macro_f1"])
+            curves.setdefault(config.MODEL_NAMES_LT[m], []).append((n, r["test_macro_f1"].mean(), r["test_macro_f1"].std()))
+        rule = []
+        for seed in config.SEEDS:
+            subset = load_emotion(fraction=f, seed=seed)
+            rule.append(macro_f1s(d["y_test"], [keyword_rule(subset["x_train"], subset["y_train"])(d["x_test"])])[0])
+        row["Raktinio žodžio taisyklė"] = mean_sd(rule)
+        curves.setdefault("Raktinio žodžio taisyklė", []).append((n, np.mean(rule), np.std(rule, ddof=1)))
+        table[f"{n:,}".replace(",", " ")] = row
+    table = pd.DataFrame(table).T
+    print(table.to_string())
+    save(table, "s4_train_size.csv", "mokymo tekstų (testavimo imties makro F-matas; 5 sėklos)")
+
+    fig, ax = plt.subplots(figsize=(7, 4.2))
+    for name, points in curves.items():
+        n, mean, sd = map(np.array, zip(*points))
+        style = {"linestyle": "--", "color": "gray"} if name.startswith("Raktinio") else {"marker": "o"}
+        ax.errorbar(n, mean, yerr=sd, capsize=3, label=name, **style)
+    ax.set_xscale("log", base=2)
+    ax.set_xticks(n, [f"{v:,}".replace(",", " ") for v in n])
+    ax.minorticks_off()
+    ax.set_xlabel("Mokymo tekstų skaičius")
+    ax.set_ylabel("Makro F-matas (testavimo imtis)")
+    ax.set_ylim(0, 1)
+    comma_axis(ax.yaxis)
+    ax.set_title("Mokymo imties dydžio įtaka (vidurkis ± st. nuokrypis, 5 sėklos)")
+    ax.grid(alpha=0.3)
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    path = os.path.join(FIGURES_DIR, "s4_learning_curve.png")
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+    print("Išsaugota:", path)
+
+
+def to_binary(labels):
+    """Six emotions -> 1 = positive (joy, love, surprise; config.POSITIVE_CLASSES), 0 = negative."""
+    return np.isin(labels, config.POSITIVE_CLASSES).astype(int)
+
+
+def s5_comparisons():
+    """The S5 models trained on two classes against the six-class S1 model collapsed to two classes, on the
+    extended test: [(model, collapsed S1 predictions, trained binary predictions)], seeds 1–5 on both sides."""
+    found = []
+    for m in MODELS:
+        trained = predictions("S5", m)
+        if trained:
+            found.append((m, [to_binary(p) for p in s1_base(m)], trained))
+    return found
+
+
+def s5():
+    """S5, two classes instead of six (appendix 6). Positive = joy, love, surprise; negative = sadness, anger, fear.
+    First the free step: the six-class S1 predictions of every model collapsed to positive / negative, and the share
+    of its six-class errors that stay on the right side. Then the binary models trained for logreg, Conv1D and GRU
+    against their own collapsed S1 predictions on the extended test (binary macro-F1, paired bootstrap, Holm).
+    Surprise counts as positive, which is debatable (PLAN.md section 3)."""
+    y_test = runs("S1")[next(iter(runs("S1")))][0][1]["y_test"]
+    yb_test, yb_x = to_binary(y_test), to_binary(y_xtest())
+    comparisons = s5_comparisons()
+    tests = [evaluation.bootstrap_diff(yb_x, trained, collapsed, n_classes=2) for _, collapsed, trained in comparisons]
+    significant = evaluation.holm([t[3] for t in tests])
+    tested = {m: (*t, s) for (m, _, _), t, s in zip(comparisons, tests, significant)}
+    table = {}
+    for m in MODELS:
+        six = s1_base(m)
+        test_preds = predictions("S1", m, key="p_test", seeds=config.SEEDS)
+        errors = [p != y_test for p in test_preds]
+        row = {"sutraukta: testavimo bendras tikslumas, %": mean_sd([(to_binary(p) == yb_test).mean() for p in test_preds], 100, 1),
+               "sutraukta: išplėstinė imtis, makro F-matas": mean_sd(f1s(yb_x, [to_binary(p) for p in six], 2)),
+               "6 klasių klaidos toje pačioje pusėje, %": mean_sd([(to_binary(p[e]) == to_binary(y_test[e])).mean()
+                                                                   for p, e in zip(test_preds, errors)], 100, 1)}
+        if m in tested:
+            trained = predictions("S5", m)
+            r = rows("S5", m)
+            row["mokyta 2 klasėms: testavimo bendras tikslumas, %"] = mean_sd(r["test_acc"], 100, 1)
+            row["mokyta 2 klasėms: išplėstinė imtis, makro F-matas"] = mean_sd(f1s(yb_x, trained, 2))
+            diff, low, high, p, s = tested[m]
+            row["mokyta − sutraukta [95 % PI]"] = interval(diff, low, high)
+            row["išvada"] = verdict(low, high, s)
+        table[config.MODEL_NAMES_LT[m]] = row
+    table = pd.DataFrame(table).T.fillna("–")
+    print(table.to_string())
+    save(table, "s5_binary.csv", "modelis (2 klasės: teigiama / neigiama; 5 sėklos)")
+
+
 # ---------- 4.7: summary of the side studies ----------
 
 def summary_rows(study, models, arms_lt, study_lt):
@@ -534,21 +699,30 @@ def summary_rows(study, models, arms_lt, study_lt):
 
 
 def s47():
+    """4.7 summary: the best setting of each side study against S1 on the extended test, Holm over the whole table.
+    S5 is compared in two classes: the binary model against S1 collapsed to two classes (binary macro-F1).
+    S4 is not here: it kept no extended-test predictions; its curve is in s4_train_size.csv (appendix 5)."""
     y = y_xtest()
-    found = (summary_rows("S10", SIDE_MODELS, S10_ARMS_LT, "S10 reguliarizacija")
-             + summary_rows("S11", ["conv1d", "lstm", "gru"], {"layers2": "2 sluoksniai"}, "S11 gylis"))
-    # A adds the rows of S12, S4 and S5 here, in the same form
-    tests = against({i: (arm, s1_preds) for i, (_, (s1_preds, arm)) in enumerate(found)})
+    found = [(row, y, s1_preds, arm, 6) for row, (s1_preds, arm) in
+             summary_rows("S10", SIDE_MODELS, S10_ARMS_LT, "S10 reguliarizacija")
+             + summary_rows("S11", ["conv1d", "lstm", "gru"], {"layers2": "2 sluoksniai"}, "S11 gylis")
+             + summary_rows("S12", SIDE_MODELS, S12_ARMS_LT, S12_LT)]
+    found += [({"tyrimas": S5_LT, "modelis": config.MODEL_NAMES_LT[m],
+                "geriausias nustatymas": "mokyta 2 klasėms (S1 sutrauktas į 2 klases)"}, to_binary(y), collapsed, trained, 2)
+              for m, collapsed, trained in s5_comparisons()]
+    tests = [evaluation.bootstrap_diff(yy, arm, s1_preds, n_classes=k) for _, yy, s1_preds, arm, k in found]
+    significant = evaluation.holm([t[3] for t in tests])
     table = []
-    for i, (row, (s1_preds, arm)) in enumerate(found):
-        row = row | {"S1": mean_sd(macro_f1s(y, s1_preds)), "nustatymas": mean_sd(macro_f1s(y, arm))}
-        table.append(diff_columns(row, tests[i]))
+    for (row, yy, s1_preds, arm, k), t, s in zip(found, tests, significant):
+        row = row | {"S1": mean_sd(f1s(yy, s1_preds, k)), "nustatymas": mean_sd(f1s(yy, arm, k))}
+        table.append(diff_columns(row, (*t, s)))
     table = pd.DataFrame(table).set_index("tyrimas")
     print(table.to_string())
     save(table, "s47_summary.csv", "tyrimas (makro F-matas išplėstinėje imtyje; geriausias pagal parinkimo imtį)")
 
 
-PARTS = {"S9": s9, "T0": t0, "S1": s1, "S2": s2, "S3": s3, "S10": s10, "S11": s11, "S47": s47}
+PARTS = {"S9": s9, "T0": t0, "S1": s1, "S2": s2, "S3": s3, "S10": s10, "S11": s11, "S12": s12, "S4": s4, "S5": s5,
+         "S47": s47}
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")

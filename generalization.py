@@ -137,6 +137,39 @@ def keyword_group_table(d):
     return pd.DataFrame(rows).T
 
 
+GROUP_FIGURE_MODELS = ["logreg", "conv1d", "gru", "bilstm_attention", "distilbert"]   # a readable subset
+
+
+def plot_keyword_groups(d, path):
+    """Accuracy per keyword group for the keyword rule and a few models (all their seeds): where the emotion word is
+    pure every model is right; the models differ, and beat the rule, only where it is ambiguous or missing."""
+    y = d["y_test"]
+    groups = keyword_groups(d["x_test"], d["x_train"], d["y_train"])
+    series = {RULE_LT: [keyword_rule(d["x_train"], d["y_train"])(d["x_test"])]}
+    for study in ["S1", "S14"]:
+        for (model, _), seed_runs in runs(study).items():
+            if model in GROUP_FIGURE_MODELS:
+                series[config.MODEL_NAMES_LT[model]] = [z["p_test"] for _, z in seed_runs]
+    x = np.arange(len(GROUPS_LT))
+    width = 0.8 / len(series)
+    fig, ax = plt.subplots(figsize=(9, 5))
+    for i, (name, predictions) in enumerate(series.items()):
+        accuracy = [np.mean([(p[groups == g] == y[groups == g]).mean() for p in predictions]) * 100 for g in GROUPS_LT]
+        ax.bar(x + (i - (len(series) - 1) / 2) * width, accuracy, width=width, label=name,
+               color="gray" if name == RULE_LT else None)
+    ax.set_xticks(x, [f"{lt}\n(n = {(groups == g).sum()})" for g, lt in GROUPS_LT.items()])
+    ax.set_ylabel("Bendras tikslumas, %")
+    ax.set_ylim(0, 100)
+    comma_axis(ax.yaxis)
+    ax.set_title("Tikslumas pagal emocijos žodį (testavimo imtis)")
+    ax.grid(axis="y", alpha=0.3)
+    ax.legend(fontsize=8, ncol=3, loc="upper center", bbox_to_anchor=(0.5, -0.2), frameon=False)
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+    print("Išsaugota:", path)
+
+
 def keyword_copies_table(d):
     """Macro-F1 on the keyword test texts for the original text and its copies (data.keyword_variants): S1 models,
     DistilBERT (S14), the context-only models (S16, trained without the emotion word) and the keyword rule.
@@ -285,6 +318,7 @@ def s13():
     groups = keyword_group_table(d)
     print(groups.to_string())
     save(groups, "s13_keyword_groups.csv", "modelis (bendras tikslumas, %)")
+    plot_keyword_groups(d, os.path.join(FIGURES_DIR, "s13_keyword_groups.png"))
     copies, means, n_texts = keyword_copies_table(d)
     print(copies.to_string())
     save(copies, "s13_keyword_copies.csv", f"modelis (makro F-matas, {n_texts} tekstų)")
@@ -477,11 +511,42 @@ def plot_goemotions_confusion(path):
     print("Išsaugota:", path)
 
 
+def plot_lithuanian(path):
+    """Macro-F1 on the extended test of every model trained in English (S1, seeds 1–5) and in Lithuanian (S15) on
+    the same texts, and multilingual DistilBERT trained in English only, tested in both languages (S14b)."""
+    names, english, lithuanian = [], [], []
+    for (model, _), en in runs("S1").items():
+        lt = first_runs("S15", model)
+        names.append(config.MODEL_NAMES_LT[model])
+        english.append(np.mean([macro_f1(z["y_xtest"], z["p_xtest"]) for _, z in five_seeds(en)]))
+        lithuanian.append(np.mean([macro_f1(z["y_xtest"], z["p_xtest"]) for _, z in lt]))
+    for (model, _), multi in runs("S14b").items():
+        names.append(config.MODEL_NAMES_LT[model] + "\n(be lietuviško mokymo)")
+        english.append(np.mean([macro_f1(z["y_xtest"], z["p_xtest"]) for _, z in multi]))
+        lithuanian.append(np.mean([macro_f1(z["y_lt_xtest"], z["p_lt_xtest"]) for _, z in multi]))
+    y = np.arange(len(names))[::-1]                  # first model at the top
+    fig, ax = plt.subplots(figsize=(8, 0.45 * len(names) + 1.3))
+    ax.barh(y + 0.2, english, height=0.4, label="anglų k.", color="tab:blue")
+    ax.barh(y - 0.2, lithuanian, height=0.4, label="lietuvių k. (mūsų modeliai mokyti lietuviškai)", color="tab:orange")
+    ax.set_yticks(y, names)
+    ax.set_xlim(0, 1)
+    ax.set_xlabel("Makro F-matas (išplėstinė testavimo imtis, tie patys tekstai)")
+    comma_axis(ax.xaxis)
+    ax.set_title("Tie patys tekstai anglų ir lietuvių kalba")
+    ax.grid(axis="x", alpha=0.3)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=2, fontsize=8, frameon=False)
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+    print("Išsaugota:", path)
+
+
 def s6():
     d = load_emotion()
     lithuanian = lithuanian_table()
     print(lithuanian.to_string())
     save(lithuanian, "s15_lithuanian.csv", "modelis (makro F-matas)")
+    plot_lithuanian(os.path.join(FIGURES_DIR, "s15_en_vs_lt.png"))
     groups = lithuanian_groups_table(d)
     print(groups.to_string())
     save(groups, "s15_keyword_groups.csv", "modelis (bendras tikslumas, %)")

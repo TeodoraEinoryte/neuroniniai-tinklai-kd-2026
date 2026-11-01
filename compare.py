@@ -140,11 +140,11 @@ def s9():
                     color="white" if v < 0.6 else "black")
         ax.set_xticks(range(len(rates)), [rate(r) for r in rates], fontsize=9)
         ax.set_yticks(range(len(optimizers)), [OPTIMIZERS_LT[o] for o in optimizers] if model == SIDE_MODELS[0] else [])
-        ax.set_xlabel("mokymosi greitis η")
+        ax.set_xlabel("Mokymosi greitis η")
         ax.set_title(config.MODEL_NAMES_LT[model])
         for r in rates:
             table[f"{config.MODEL_NAMES_LT[model]}, η = {rate(r)}"] = [number(v) for v in values[r]]
-    colorbar = fig.colorbar(image, ax=axes, shrink=0.85, label="validavimo makro F-matas (1 sėkla)")
+    colorbar = fig.colorbar(image, ax=axes, shrink=0.85, label="Validavimo makro F-matas (1 sėkla)")
     comma_axis(colorbar.ax.yaxis)
     path = os.path.join(FIGURES_DIR, "s9a_heatmap.png")
     fig.savefig(path, dpi=120)
@@ -382,10 +382,10 @@ def s2():
             length_table[f"{config.MODEL_NAMES_LT[model]}: {MASK_ARMS_LT[arm]}"] = [number(v, 1) for v in accuracy]
         ax.set_xticks(range(len(bins)), labels, fontsize=8)
         ax.set_title(config.MODEL_NAMES_LT[model])
-        ax.set_xlabel("teksto ilgis, žodžiai")
+        ax.set_xlabel("Teksto ilgis, žodžiai")
         ax.grid(alpha=0.3)
         comma_axis(ax.yaxis)
-    axes[0].set_ylabel("bendras tikslumas, %")
+    axes[0].set_ylabel("Bendras tikslumas, %")
     axes[0].legend(fontsize=8, loc="lower left")
     path = os.path.join(FIGURES_DIR, "s2_length.png")
     fig.savefig(path, dpi=120)

@@ -1,5 +1,5 @@
 modelis,"optimizatorius, mokymosi greitis",sėklų,parinkimo imtis,"testavimo imtis: bendras tikslumas, %",testavimo imtis: makro F-matas,išplėstinė imtis: makro F-matas,skirtumas išplėstinėje imtyje [95 % PI],p,išvada,grupė
-DistilBERT,"Adam, 0,00002",3,"0,899","92,6 ± 0,3","0,880 ± 0,007","0,904 ± 0,001","0,001 [-0,001; 0,003]","0,542",praktiškai lygus,1
+DistilBERT,"Adam, 0,00002",6,"0,899","92,7 ± 0,3","0,882 ± 0,007","0,904 ± 0,002","0,001 [-0,001; 0,002]","0,478",praktiškai lygus,1
 GRU,"Adam, 0,01",8,"0,898","93,0 ± 0,2","0,885 ± 0,006","0,903 ± 0,003",etalonas,–,etalonas,1
 BiLSTM + dėmesys,"SGD + Nesterov, 0,3",8,"0,896","92,7 ± 0,5","0,887 ± 0,008","0,900 ± 0,004","-0,002 [-0,004; -0,001]","< 0,002","praktiškai lygus, nors reikšmingai blogesnis",2
 LSTM,"Adam, 0,01",8,"0,894","92,4 ± 0,4","0,882 ± 0,008","0,899 ± 0,003","-0,004 [-0,005; -0,002]","< 0,002","praktiškai lygus, nors reikšmingai blogesnis",2

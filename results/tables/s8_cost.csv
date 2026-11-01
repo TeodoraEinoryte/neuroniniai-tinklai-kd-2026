@@ -1,0 +1,12 @@
+"modelis (prognozavimo laikas: mediana iš 5, paketas 64, 8 gijos, vienas kompiuteris)",parametrų,iš jų žodžių vektoriai,be žodžių vektorių,"mokymo laikas, s (mediana)",s / epochą (mediana),"prognozavimo laikas 1 000 tekstų, ms",išplėstinė imtis: makro F-matas
+Logistinė regresija,60 006,0,60 006,13,"0,4",62,"0,857 ± 0,001"
+MLP,640 454,0,640 454,7,"0,8",59,"0,860 ± 0,001"
+Embedding,644 550,640 000,4 550,6,"0,8",50,"0,827 ± 0,005"
+Conv1D,681 862,640 000,41 862,7,"1,2",63,"0,896 ± 0,002"
+Transformeris,677 062,640 000,37 062,19,"3,8",114,"0,872 ± 0,003"
+SimpleRNN,648 646,640 000,8 646,23,"2,0",82,"0,732 ± 0,060"
+LSTM,739 590,640 000,99 590,27,"5,4",206,"0,899 ± 0,003"
+GRU,715 270,640 000,75 270,20,"5,0",189,"0,903 ± 0,003"
+BiLSTM,1 300 486,640 000,660 486,99,"19,8",840,"0,895 ± 0,008"
+BiLSTM + dėmesys,723 462,640 000,83 462,46,"5,4",234,"0,900 ± 0,004"
+DistilBERT,66 958 086,23 440 896,43 517 190,1511,"503,8",16044,"0,904 ± 0,002"

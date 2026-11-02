@@ -14,7 +14,7 @@ Columns: text_lt, text_en, label.
 The two extra sets are drawn the way the official 20,000 seem to be: random ROWS of the corpus, so a text that
 occurs several times (often with different labels) is as likely to be drawn as there. A first version drew unique
 texts and dropped those with two labels; it had half as many ambiguous texts as the official test (7.0 % vs 13.9 %)
-and every model scored ~7 points higher on it (PLAN.md, step 1.9). Here: no text from our 20,000, the class shares
+and every model scored ~7 points higher on it. Here: no text from our 20,000, the class shares
 of the official test, and no text in both sets.
 
 Run: python download_carer_extra.py

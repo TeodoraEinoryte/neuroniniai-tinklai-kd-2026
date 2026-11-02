@@ -87,7 +87,7 @@ def load_emotion(task="6", fraction=1.0, seed=1, lang="en"):
 
 
 def load_carer_extra(part, task="6", lang="en"):
-    """Extra CARER texts, never trained on (download_carer_extra.py, PLAN.md section 3):
+    """Extra CARER texts, never trained on (download_carer_extra.py):
     part "select" = selection set (20,000; all choices in T0), "xtest" = extended test (50,000).
     Returns (x, y); lang "lt" gives the Lithuanian translation of the same texts."""
     df = pd.read_csv(_path(f"carer_{part}.csv"))
@@ -199,7 +199,7 @@ def keyword_counts(train_texts, train_labels):
 
 
 def keyword_groups(texts, train_texts, train_labels, purity=0.95):
-    """Group of each text by its emotion word (S13; PLAN.md section 3):
+    """Group of each text by its emotion word (S13):
     "pure"      the word's train texts have its most common label at least `purity` of the time
     "ambiguous" the word is an emotion word in train, but less pure
     "none"      the text has no emotion word

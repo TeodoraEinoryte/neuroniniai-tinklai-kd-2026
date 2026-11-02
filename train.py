@@ -73,7 +73,7 @@ DEFAULTS = {
 GLOVE_DIM = 100
 NO_XTEST_STUDIES = ["dev", "S9a", "S9", "T0a", "T0b", "S4"]   # no extended-test predictions (choices, or a curve only)
 
-# Columns of results.csv (PLAN.md, section 7). Per-class F1 uses the English class names;
+# Columns of results.csv. Per-class F1 uses the English class names;
 # 6-class runs fill f1_sadness ... f1_surprise, binary runs (S5) fill f1_negative and f1_positive.
 F1_COLUMNS = [f"f1_{name}" for name in config.CLASSES_EN] + ["f1_negative", "f1_positive"]
 COLUMNS = [
@@ -127,7 +127,7 @@ def run(model, seed, study, dev=False, **options):
 
     net = build(size=o["size"], mask=o["mask"], n_classes=n_classes, **_model_extras(o, d["vectorizer"]))
     # Focal loss needs one-hot labels; cross-entropy works with the class numbers directly.
-    # alpha=1: Keras multiplies by alpha = 0.25 by default, which is not in the formula (PLAN.md, section 6)
+    # alpha=1: Keras multiplies by alpha = 0.25 by default, which is not in the formula
     if o["loss"] == "focal":
         loss = keras.losses.CategoricalFocalCrossentropy(alpha=1.0, gamma=2.0)
         y = {k: keras.utils.to_categorical(d[k], n_classes) for k in ["y_train", "y_val", "y_test"]}
@@ -261,7 +261,7 @@ def settings(model, **options):
 
 def _model_extras(o, vectorizer):
     """Options passed on to the model function; only the ones a study changes, so every model
-    function needs to accept only what its studies use (PLAN.md, section 7)."""
+    function needs to accept only what its studies use."""
     extras = {k: o[k] for k in ["dropout", "l2", "layers"] if o[k] is not None}
     if o["embedding"] == "learned100":
         extras["embedding_dim"] = GLOVE_DIM          # learned vectors of the same size as GloVe
@@ -350,7 +350,7 @@ def _append_row(path, row):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="One training run (PLAN.md, section 7).")
+    parser = argparse.ArgumentParser(description="One training run.")
     parser.add_argument("--model", required=True, choices=sorted(MODELS))
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--study", default="dev", help="S9a, S9, T0a, T0b, S1, ...; goes into results.csv and file names")

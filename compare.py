@@ -612,6 +612,7 @@ def s11():
     def extra(r):
         return {"parametrų": f"{int(r['params'].iloc[0]):,}".replace(",", " "),
                 "tarpas, proc. punktai": mean_sd(r["train_acc"] - r["val_acc"], 100, 1),
+                "geriausia epocha": number(r["best_epoch"].mean(), 1),
                 "mokymo laikas, s": number(r["train_time_s"].mean(), 0)}
 
     table, _ = side_table("S11", ["conv1d", "lstm", "gru"], {"layers2": "2 sluoksniai"}, extra)

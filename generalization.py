@@ -1,4 +1,4 @@
-"""Generalisation and what the models learn: tables and figures for report 4.8 and 4.9 (PLAN.md, section 6).
+"""Generalisation and what the models learn: tables and figures for report 4.8 and 4.9.
 
 Run: python generalization.py [S13] [S6]   (no argument = both)
     S13  keywords or context (with the context-only models of S16), report 4.8

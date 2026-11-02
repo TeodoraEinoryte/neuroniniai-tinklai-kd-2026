@@ -1,4 +1,4 @@
-"""A's models: logreg, MLP, Embedding, Conv1D, Transformer (PLAN.md, section 5).
+"""A's models: logreg, MLP, Embedding, Conv1D, Transformer.
 
 Every function returns an UNCOMPILED keras.Model; train.py compiles and trains it.
 All take the same arguments so train.py can call any model the same way:

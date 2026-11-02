@@ -1,4 +1,4 @@
-"""Comparison tables and figures for report 3.5.11, 4.2–4.7 and appendices 1–3 and 7 (PLAN.md, section 6; step 4.1).
+"""Comparison tables and figures for report 3.5.11, 4.2–4.7 and appendices 1–3 and 7.
 
 Run: python compare.py [M] [S9] [T0] [S1] [S8] [S2] [S3] [S10] [S11] [S7] [S12] [S4] [S5] [S47]   (no argument = all)
     M    the 10 models: layers, output shapes and parameter counts, report 3.5.11
@@ -18,7 +18,7 @@ Nothing is trained: everything comes from results.csv and the saved predictions.
 (Lithuanian headers, decimal comma, "mean ± sd" over the seeds), figures to results/figures/. All parts take ~8 min,
 most of it the bootstraps (S1 alone ~4 min: its groups need several rounds).
 
-Statistics (PLAN.md section 6): a difference between two models is a paired bootstrap on the extended test
+Statistics: a difference between two models is a paired bootstrap on the extended test
 (50,000 texts, evaluation.bootstrap_diff: 1,000 draws, seeds averaged), Holm-corrected over the comparisons of one
 table; McNemar per seed on the official test. The wording rule is in verdict().
 """
@@ -136,7 +136,7 @@ def macro_f1s(y, preds):
 LAYERS_LT = {"Embedding": "Embedding", "PositionEmbedding": "pozicijos", "MultiHeadAttention": "savarankiškas dėmesys",
              "GlobalAveragePooling1D": "vidurkis", "GlobalMaxPooling1D": "maksimumas", "AttentionPooling": "dėmesys",
              "Dense": "Dense", "Conv1D": "Conv1D", "SimpleRNN": "SimpleRNN", "LSTM": "LSTM", "GRU": "GRU"}
-SKIPPED_LAYERS = ["InputLayer", "Dropout", "LayerNormalization"]   # keep the shape; the report says so under the table
+SKIPPED_LAYERS = ["InputLayer", "Dropout", "LayerNormalization"]
 
 
 def spaced(n):
@@ -955,7 +955,7 @@ def s5():
     First the free step: the six-class S1 predictions of every model collapsed to positive / negative, and the share
     of its six-class errors that stay on the right side. Then the binary models trained for logreg, Conv1D and GRU
     against their own collapsed S1 predictions on the extended test (binary macro-F1, paired bootstrap, Holm).
-    Surprise counts as positive, which is debatable (PLAN.md section 3)."""
+    Surprise counts as positive, which is debatable."""
     y_test = runs("S1")[next(iter(runs("S1")))][0][1]["y_test"]
     yb_test, yb_x = to_binary(y_test), to_binary(y_xtest())
     comparisons = s5_comparisons()

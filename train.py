@@ -4,7 +4,7 @@ Run: python train.py --model lstm --seed 1 --study S1 [--size 64] [--no-mask | -
                      [--class-weight] [--loss focal] [--fraction 0.25] [--task 2] [--optimizer sgd --lr 0.1]
                      [--dropout 0.5] [--l2 0.0001] [--layers 2] [--embedding glove-frozen] [--lang lt]
                      [--without-keyword] [--corpus goemotions] [--dev]
-Everything not given on the command line comes from config.py (PLAN.md, section 4).
+Everything not given on the command line comes from config.py.
 """
 import argparse
 import csv

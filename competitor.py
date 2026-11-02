@@ -1,4 +1,4 @@
-"""S14 and S14b: DistilBERT fine-tuned on our train split, the competitor of our models (PLAN.md, section 6).
+"""S14 and S14b: DistilBERT fine-tuned on our train split, the competitor of our models.
 
 Run: python competitor.py --seed 1                # S14: English DistilBERT (distil_bert_base_en_uncased)
      python competitor.py --seed 1 --study S14b   # S14b: multilingual DistilBERT, trained in English, tested in Lithuanian

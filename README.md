@@ -48,5 +48,4 @@ python predict.py "I feel so alone tonight"     # komandinė eilutė; --lang lt 
 
 Visi rezultatai – `results/`: `results.csv` (eilutė kiekvienam paleidimui), `predictions/` (kiekvieno paleidimo
 prognozės), `tables/` ir `figures/` (ataskaitos lentelės ir paveikslai). Išmokyti modeliai, išskyrus įrankio, į
-repozitoriją nekeliami (per dideli); juos atkuria `run_study.py`: paleidimas su ta pačia pradine reikšme (angl. seed)
-tame pačiame kompiuteryje ir su tomis pačiomis bibliotekų versijomis pasikartoja tiksliai.
+repozitoriją nekeliami; juos atkuria `run_study.py`.

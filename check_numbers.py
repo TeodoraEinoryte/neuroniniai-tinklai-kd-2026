@@ -1,14 +1,13 @@
-"""Number check (PLAN.md, step 6.2): every number in the exported report must come from a generated table.
+"""Number check: every number in the exported report must come from a generated table.
 
-Run: python check_numbers.py ataskaita.docx [--from "4. PRAKTINĖ DALIS"]
+Run: python check_numbers.py ataskaita.docx
 Reads the .docx (Word export of the Google Doc), takes every number with a decimal comma ("0,903", "−0,006",
 "92,4") and every number with thousands groups ("66 958 086", "2 000"), and looks each one up among the numbers
 of results/tables/*.csv (headers included). Prints only the numbers it cannot find, with their section and the
 text around them; those are checked by hand. A number found with the other sign counts as found ("+0,046" in the
 text, "0,046 [0,043; 0,049]" in a table). Numbers worked out in the text (a difference of two table values,
 ms → s) are expected among the misses. Whole numbers without a comma (years, section and formula numbers, counts)
-are not checked: too many of them are not results. Notes in square brackets ("[A · ~1 300 ženklų] …") are skipped,
-since they are removed before the report is handed in.
+are not checked: too many of them are not results.
 """
 import argparse
 import csv

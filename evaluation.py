@@ -159,7 +159,7 @@ def _divide(a, b):
 
 
 if __name__ == "__main__":
-    # Small example computed by hand (step 1.2 of PLAN.md): 10 texts, 3 classes
+    # Small example computed by hand: 10 texts, 3 classes
     y  = np.array([0, 0, 0, 0, 1, 1, 1, 2, 2, 2])
     p1 = np.array([0, 0, 1, 2, 1, 1, 0, 2, 2, 1])
     p2 = np.array([0, 0, 0, 0, 1, 1, 1, 2, 2, 1])

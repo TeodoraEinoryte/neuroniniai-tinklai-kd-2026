@@ -8,8 +8,7 @@ VilniusTECH kursinis darbas, dalykas „Neuroniniai tinklai“ (FMITM24102), 202
 
 Dešimt neuroninių tinklų modelių (logistinė regresija, MLP, Embedding, Conv1D, transformeris, SimpleRNN, LSTM, GRU,
 BiLSTM, BiLSTM su dėmesio mechanizmu) palyginami atpažįstant šešias emocijas angliškuose tekstuose (dair-ai/emotion),
-su DistilBERT kaip konkurentu, kitame rinkinyje (GoEmotions) ir lietuviškame vertime. Išsamus planas ir kiekvieno
-žingsnio būsena – [`PLAN.md`](PLAN.md).
+su DistilBERT kaip konkurentu, kitame rinkinyje (GoEmotions) ir lietuviškame vertime.
 
 ## Diegimas
 

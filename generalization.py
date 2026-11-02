@@ -114,7 +114,7 @@ def comma_axis(axis):
 # ---------- S13 (with S16): keywords or context? Report 4.8 ----------
 
 def keyword_group_table(d):
-    """Accuracy per keyword group of the test texts (data.keyword_groups; PLAN.md section 3) for the S1 models,
+    """Accuracy per keyword group of the test texts (data.keyword_groups) for the S1 models,
     DistilBERT (S14), the keyword rule and the majority class. Where the emotion word is pure every model is
     almost always right, so the architectures can differ only on the ambiguous and no-word groups."""
     y = d["y_test"]
@@ -412,7 +412,7 @@ def lithuanian_groups_table(d):
 
 
 def vocabulary_table():
-    """The same train texts in English and Lithuanian (PLAN.md section 3): Lithuanian has about twice as many word
+    """The same train texts in English and Lithuanian: Lithuanian has about twice as many word
     forms, so the vocabulary of VOCAB_SIZE covers fewer word occurrences and more validation words are unknown."""
     rows = {}
     for lang, name in [("en", "anglų k."), ("lt", "lietuvių k.")]:

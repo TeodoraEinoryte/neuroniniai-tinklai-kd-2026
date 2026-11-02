@@ -94,7 +94,7 @@ def p_text(p):
 
 
 def verdict(low, high, significant):
-    """The wording rule of PLAN.md section 6, for the difference model − reference and its 95 % interval:
+    """The wording rule for the difference model − reference and its 95 % interval:
     "practically equal" when the whole interval lies within ±0.01 (even if the difference is real, it is
     negligible: then it says so); "better" / "worse" when the interval excludes 0 and survives Holm;
     otherwise "no clear difference"."""
@@ -268,7 +268,7 @@ def t0():
 # ---------- S1: main comparison (report 4.4, appendix 7) ----------
 
 def groups(candidates, sel, first_tests, reference):
-    """Groups of models that cannot be told apart (PLAN.md section 6). Round 1: the reference and every model whose
+    """Groups of models that cannot be told apart. Round 1: the reference and every model whose
     difference from it is not significant after Holm (first_tests, the main table's own tests). Then the best
     remaining model by selection-set macro-F1 becomes the next reference, and so on."""
     group, left, k = {}, list(candidates), 1
@@ -624,7 +624,7 @@ def s11():
 
 AUDIT_DIR = os.path.join(config.RESULTS_DIR, "audit")
 AUDIT_SIZE = 100
-AUDIT_SHARE = 0.8              # a text counts as hard if at least 80 % of the S1 runs get it wrong (PLAN.md S7)
+AUDIT_SHARE = 0.8              # a text counts as hard if at least 80 % of the S1 runs get it wrong (S7)
 AUDIT_SEED = 2026
 # Error categories (results/audit/README.md). We label only what needs a person, codes 0–3; for code 0 the
 # category follows from the text's keyword group (data.keyword_groups), the same groups as in S13 and report 4.8
@@ -644,7 +644,7 @@ def confusion_shares(y, preds):
 
 
 def audit_sample(x, y, all_runs, groups):
-    """The audit sample (PLAN.md S7): of the extended-test texts that at least 80 % of the S1 runs get wrong, a
+    """The audit sample (S7): of the extended-test texts that at least 80 % of the S1 runs get wrong, a
     random 100 (fixed seed). The official test has only 33 such texts, so the extended test is used. Written once;
     later runs read it back, so the labels in audit_A.csv / audit_B.csv always belong to the same texts."""
     path = os.path.join(AUDIT_DIR, "audit_sample.csv")

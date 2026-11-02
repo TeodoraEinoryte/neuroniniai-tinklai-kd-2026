@@ -1,10 +1,10 @@
-# Shared settings, the same for every run (PLAN.md, section 4). Change only after both agree.
+# Shared settings, the same for every run
 
 # Class names by label index: English as in the dataset, Lithuanian for printed output and the report
 CLASSES_EN = ["sadness", "joy", "love", "anger", "fear", "surprise"]
 CLASSES_LT = ["liūdesys", "džiaugsmas", "meilė", "pyktis", "baimė", "nuostaba"]
 
-# Model names in report tables and figures, in the order of PLAN.md section 5 (+ the DistilBERT competitors)
+# Model names in report tables and figures
 MODEL_NAMES_LT = {"logreg": "Logistinė regresija", "mlp": "MLP", "embedding": "Embedding", "conv1d": "Conv1D",
                   "transformer": "Transformeris", "simplernn": "SimpleRNN", "lstm": "LSTM", "gru": "GRU",
                   "bilstm": "BiLSTM", "bilstm_attention": "BiLSTM + dėmesys", "distilbert": "DistilBERT",
@@ -29,7 +29,7 @@ EMBEDDING_DIM = 64
 NO_MASK_MODELS = ["transformer"]
 
 # Default optimiser and learning rate: T0a runs with them, and a model keeps them unless T0b finds a pair that is
-# better by more than TIE_MARGIN on the selection set (PLAN.md, section 4)
+# better by more than TIE_MARGIN on the selection set
 OPTIMIZER = "adam"
 LEARNING_RATE = 0.001
 TIE_MARGIN = 0.005      # macro-F1; the default (middle T0a size, Adam 0.001) stays unless beaten by more
@@ -37,7 +37,7 @@ BATCH_SIZE = 64
 EPOCHS = 30             # upper limit; EarlyStopping usually stops earlier
 PATIENCE = 3            # EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True)
 SEEDS = [1, 2, 3, 4, 5] # for keras.utils.set_random_seed
-# S1 seeds rule (PLAN.md section 6): the top group's means were within 0.5 points (0.0038 on the extended test,
+# S1 seeds rule: the top group's means were within 0.5 points (0.0038 on the extended test,
 # step 4.1), so its members get 3 more seeds; DistilBERT's are run by competitor.py
 S1_EXTRA_SEEDS = {"lstm": [6, 7, 8], "gru": [6, 7, 8], "bilstm_attention": [6, 7, 8]}
 

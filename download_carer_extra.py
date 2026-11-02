@@ -1,4 +1,4 @@
-"""Used once to create the extra data files from the Lithuanian CARER corpus (PLAN.md, section 3, step 1.9).
+"""Used once to create the extra data files from the Lithuanian CARER corpus.
 Normally not needed: data.py reads the CSVs.
 
 Source: SkyWater21/lt_twitter_emotions on Hugging Face (MIT licence), the whole CARER corpus (416,809 rows)

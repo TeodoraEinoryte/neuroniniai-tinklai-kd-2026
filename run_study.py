@@ -1,4 +1,4 @@
-"""Run all training runs of one study (PLAN.md, section 6).
+"""Run all training runs of one study.
 
 Run: python run_study.py S1 [--dev]
 Runs already in results.csv are skipped, so an interrupted study can simply be started again. A run counts as

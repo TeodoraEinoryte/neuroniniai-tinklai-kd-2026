@@ -2,7 +2,7 @@
 data/glove/glove.6B.100d.txt (~330 MB, git-ignored). data.py reads that file.
 
 Source: the Stanford NLP group's copy on Hugging Face (stanfordnlp/glove, glove.6B.zip, 862 MB; the same zip as
-nlp.stanford.edu/data/glove.6B.zip, which did not respond on 2026-10-31). Only the 100-d file is kept.
+nlp.stanford.edu/data/glove.6B.zip). Only the 100-d file is kept.
 
 Run: python download_glove.py
 """

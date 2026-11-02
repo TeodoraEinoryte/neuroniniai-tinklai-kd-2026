@@ -1,10 +1,8 @@
-"""Small web app (PLAN.md section 7, step 4.4): an English or Lithuanian sentence in, the emotion probabilities out,
+"""Small web app: an English or Lithuanian sentence in, the emotion probabilities out,
 the words the attention model looked at, and a warning when many words are unknown to the model.
 
 Run: python app.py      then open http://localhost:7860
 Uses the app's models in results/models/app/ (python predict.py --save-models) through predict.EmotionModel.
-Colours and font follow the VILNIUS TECH slide template ("Vilnius Tech Spalvos": blue 0B4DC7, orange F68B28; Arial),
-so the demo recording matches the talk's slides.
 """
 import gradio as gr
 
@@ -22,7 +20,6 @@ EXAMPLES = [["I feel so alone tonight", CHOICES[0]],
             ["Šiandien jaučiuosi labai vieniša ir liūdna", CHOICES[1]],
             ["Jaučiuosi labai laiminga, kad tave sutikau", CHOICES[1]]]
 
-# VILNIUS TECH blue as the theme's main colour (buttons, selected model), shades around 0B4DC7
 VILNIUS_TECH_BLUE = gr.themes.Color(name="vilniustech_blue", c50="#EAF0FC", c100="#D5E1F9", c200="#AEC4F2",
                                     c300="#7FA2E9", c400="#4F7EDD", c500="#0B4DC7", c600="#0A44B0",
                                     c700="#083A96", c800="#062F7A", c900="#05255F", c950="#031A44")

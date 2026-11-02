@@ -1,4 +1,4 @@
-"""Emotion of one sentence with the app's models (PLAN.md section 7, step 4.4); app.py uses the same code.
+"""Emotion of one sentence with the app's models; app.py uses the same code.
 
 Run: python predict.py "i feel so alone tonight"
      python predict.py --lang lt "šiandien jaučiuosi labai vieniša"

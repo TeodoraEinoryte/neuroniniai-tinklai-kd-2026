@@ -1,5 +1,4 @@
-"""S8, inference time: how long each saved S1 model and DistilBERT (S14) take to classify 1,000 texts
-(PLAN.md section 6; step 4.5).
+"""S8, inference time: how long each saved S1 model and DistilBERT (S14) take to classify 1,000 texts.
 
 Run: python timing.py      (~3 min; all models on one machine, so the times can be compared)
 For every model, seed 1: load the saved model, encode the first 1,000 test texts beforehand (so only the model is
@@ -16,7 +15,7 @@ from datetime import datetime
 
 import tensorflow as tf
 
-THREADS = 8                                       # fixed: both our machines have 16 logical processors
+THREADS = 8
 tf.config.threading.set_intra_op_parallelism_threads(THREADS)   # must be set before TensorFlow runs anything
 tf.config.threading.set_inter_op_parallelism_threads(1)
 

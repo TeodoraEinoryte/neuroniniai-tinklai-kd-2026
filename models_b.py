@@ -1,4 +1,4 @@
-"""B's models: SimpleRNN, LSTM, GRU, BiLSTM, BiLSTM + attention (PLAN.md, section 5).
+"""B's models: SimpleRNN, LSTM, GRU, BiLSTM, BiLSTM + attention.
 
 Same rules as models_a.py: every function returns an UNCOMPILED keras.Model; train.py compiles and trains it.
 All five take the same arguments:
